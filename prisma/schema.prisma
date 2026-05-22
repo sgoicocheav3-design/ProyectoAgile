@@ -1,0 +1,191 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum RolUsuario {
+  CONTRIBUYENTE
+  INSPECTOR
+  ADMINISTRADOR
+}
+
+enum EstadoTramite {
+  INICIADO
+  DOCUMENTOS_PENDIENTES
+  PAGADO
+  EN_INSPECCION
+  OBSERVADO
+  SEGUNDA_INSPECCION
+  APROBADO
+  NEGADO
+}
+
+enum EstadoPago {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+  CANCELADO
+}
+
+enum ResultadoInspeccion {
+  CONFORME
+  OBSERVADO
+  RECHAZADO
+}
+
+enum TipoDocumento {
+  PLANO_LOCAL
+  ACTA_INSPECCION
+  OTRO
+}
+
+model Usuario {
+  id            String       @id @default(cuid())
+  email         String       @unique
+  passwordHash  String       @map("password_hash")
+  rol           RolUsuario   @default(CONTRIBUYENTE)
+  nombre        String
+  dni           String?      @unique
+  telefono      String?
+  activo        Boolean      @default(true)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  negocios      Negocio[]
+  inspecciones  Inspeccion[] @relation("InspectorInspecciones")
+
+  @@map("usuarios")
+}
+
+model Negocio {
+  id              String    @id @default(cuid())
+  ruc             String    @unique
+  razonSocial     String    @map("razon_social")
+  domicilioFiscal String    @map("domicilio_fiscal")
+  departamento    String
+  provincia       String
+  distrito        String?
+  activo          Boolean   @default(true)  // Estado SUNAT: ACTIVO
+  habido          Boolean   @default(true)  // Condición SUNAT: HABIDO
+  tipoContribuyente String? @map("tipo_contribuyente")
+  usuarioId       String    @map("usuario_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  usuario         Usuario   @relation(fields: [usuarioId], references: [id])
+  tramites        Tramite[]
+
+  @@map("negocios")
+}
+
+model Tramite {
+  id                    String        @id @default(cuid())
+  negocioId             String        @map("negocio_id")
+  estado                EstadoTramite @default(INICIADO)
+  codigoLicencia        String?       @unique @map("codigo_licencia")
+  qrData                String?       @map("qr_data")         // URL de verificación
+  licenciaVigenteDesde  DateTime?     @map("licencia_vigente_desde")
+  licenciaVigenteHasta  DateTime?     @map("licencia_vigente_hasta")
+  esRenovacion          Boolean       @default(false) @map("es_renovacion")
+  tramiteOrigenId       String?       @map("tramite_origen_id") // Para renovaciones
+  motivoNegado          String?       @map("motivo_negado")
+  fechaInicio           DateTime      @default(now()) @map("fecha_inicio")
+  fechaAprobacion       DateTime?     @map("fecha_aprobacion")
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+
+  negocio               Negocio       @relation(fields: [negocioId], references: [id])
+  tramiteOrigen         Tramite?      @relation("Renovaciones", fields: [tramiteOrigenId], references: [id])
+  renovaciones          Tramite[]     @relation("Renovaciones")
+  pagos                 Pago[]
+  inspecciones          Inspeccion[]
+  documentos            Documento[]
+  historialInfraestructura HistorialInfraestructura[]
+
+  @@map("tramites")
+}
+
+model Pago {
+  id                  String     @id @default(cuid())
+  tramiteId           String     @map("tramite_id")
+  monto               Decimal    @db.Decimal(10, 2)
+  referenciaPasarela  String?    @map("referencia_pasarela")  // Payment ID de MercadoPago
+  preferenceId        String?    @map("preference_id")         // Preference ID de MercadoPago
+  estadoPago          EstadoPago @default(PENDIENTE) @map("estado_pago")
+  esRenovacion        Boolean    @default(false) @map("es_renovacion")
+  fechaPago           DateTime?  @map("fecha_pago")
+  metadatos           Json?      // Datos crudos del webhook
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
+
+  tramite             Tramite    @relation(fields: [tramiteId], references: [id])
+
+  @@map("pagos")
+}
+
+model Inspeccion {
+  id               String              @id @default(cuid())
+  tramiteId        String              @map("tramite_id")
+  inspectorId      String              @map("inspector_id")
+  fechaProgramada  DateTime            @map("fecha_programada")
+  fechaRealizada   DateTime?           @map("fecha_realizada")
+  resultado        ResultadoInspeccion?
+  observaciones    String?             @db.Text
+  urlActa          String?             @map("url_acta")
+  numeroVisita     Int                 @map("numero_visita") // 1 o 2
+  fechaLimite      DateTime?           @map("fecha_limite")  // Para visita 2: max 30 días hábiles
+  completada       Boolean             @default(false)
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  tramite          Tramite             @relation(fields: [tramiteId], references: [id])
+  inspector        Usuario             @relation("InspectorInspecciones", fields: [inspectorId], references: [id])
+
+  @@map("inspecciones")
+}
+
+model Documento {
+  id          String        @id @default(cuid())
+  tramiteId   String        @map("tramite_id")
+  tipo        TipoDocumento
+  url         String        // URL del archivo en Supabase Storage
+  nombre      String
+  mimeType    String?       @map("mime_type")
+  tamanio     Int?          // bytes
+  vigente     Boolean       @default(true)
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  tramite     Tramite       @relation(fields: [tramiteId], references: [id])
+
+  @@map("documentos")
+}
+
+model HistorialInfraestructura {
+  id                  String   @id @default(cuid())
+  tramiteId           String   @map("tramite_id")
+  tieneCambios        Boolean  @map("tiene_cambios")
+  descripcionCambios  String?  @map("descripcion_cambios") @db.Text
+  declaradoPor        String   @map("declarado_por")  // usuarioId
+  aceptaTerminos      Boolean  @map("acepta_terminos") // Declaración jurada
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  tramite             Tramite  @relation(fields: [tramiteId], references: [id])
+
+  @@map("historial_infraestructura")
+}
+
+model FechaNoHabil {
+  id     String   @id @default(cuid())
+  fecha  DateTime @unique
+  motivo String?  // "Feriado nacional", "Feriado municipal", etc.
+
+  @@map("fechas_no_habiles")
+}
