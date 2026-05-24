@@ -61,6 +61,7 @@ model Usuario {
 
   negocios      Negocio[]
   inspecciones  Inspeccion[] @relation("InspectorInspecciones")
+  comentarios   Comentario[]
 
   @@map("usuarios")
 }
@@ -76,11 +77,11 @@ model Negocio {
   activo          Boolean   @default(true)  // Estado SUNAT: ACTIVO
   habido          Boolean   @default(true)  // Condición SUNAT: HABIDO
   tipoContribuyente String? @map("tipo_contribuyente")
-  usuarioId       String    @map("usuario_id")
+  usuarioId       String?   @map("usuario_id")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  usuario         Usuario   @relation(fields: [usuarioId], references: [id])
+  usuario         Usuario?  @relation(fields: [usuarioId], references: [id])
   tramites        Tramite[]
 
   @@map("negocios")
@@ -148,6 +149,7 @@ model Inspeccion {
 
   tramite          Tramite             @relation(fields: [tramiteId], references: [id])
   inspector        Usuario             @relation("InspectorInspecciones", fields: [inspectorId], references: [id])
+  comentarios      Comentario[]
 
   @@map("inspecciones")
 }
@@ -188,4 +190,17 @@ model FechaNoHabil {
   motivo String?  // "Feriado nacional", "Feriado municipal", etc.
 
   @@map("fechas_no_habiles")
+}
+
+model Comentario {
+  id            String     @id @default(cuid())
+  inspeccionId  String     @map("inspeccion_id")
+  autorId       String     @map("autor_id")
+  contenido     String     @db.Text
+  createdAt     DateTime   @default(now()) @map("created_at")
+
+  inspeccion    Inspeccion @relation(fields: [inspeccionId], references: [id])
+  autor         Usuario    @relation(fields: [autorId], references: [id])
+
+  @@map("comentarios")
 }

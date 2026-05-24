@@ -179,3 +179,105 @@ function validarDigitoRUC(ruc: string): boolean {
 
   return parseInt(ruc[10]) === digitoEsperado;
 }
+
+/**
+ * Consulta RUC usando el scraper de rucperu.com
+ * Alternativa cuando ApisPerú no está disponible
+ */
+export async function consultarRucConRucPeru(
+  ruc: string
+): Promise<SunatValidationResult> {
+  if (!/^\d{11}$/.test(ruc)) {
+    return {
+      valido: false,
+      error: 'El RUC debe tener exactamente 11 dígitos numéricos.',
+      codigo: 'RUC_INVALIDO',
+    };
+  }
+
+  if (!validarDigitoRUC(ruc)) {
+    return {
+      valido: false,
+      error: 'El RUC ingresado no es válido (dígito verificador incorrecto).',
+      codigo: 'RUC_INVALIDO',
+    };
+  }
+
+  try {
+    // Importar dinámicamente para evitar circular dependencies
+    const { consultarRucEnRucPeru } = await import('./rucperu-scraper');
+
+    const rucData = await consultarRucEnRucPeru(ruc);
+
+    if (!rucData) {
+      return {
+        valido: false,
+        error: 'RUC no encontrado en rucperu.com',
+        codigo: 'RUC_INVALIDO',
+      };
+    }
+
+    // Mapear respuesta de rucperu.com al formato interno
+    const sunatData: SunatRucData = {
+      ruc: rucData.ruc || ruc,
+      razonSocial: rucData.razon_social || '',
+      domicilioFiscal: rucData.direccion || '',
+      estado: (rucData.estado || '').toUpperCase().trim(),
+      condicion: (rucData.condicion || '').toUpperCase().trim(),
+      departamento: (rucData.departamento || '').toUpperCase().trim(),
+      provincia: (rucData.provincia || '').toUpperCase().trim(),
+      distrito: (rucData.distrito || '').toUpperCase().trim(),
+      tipoContribuyente: rucData.tipo_contribuyente || '',
+    };
+
+    // Aplicar las mismas validaciones de negocio
+
+    // Regla 1: Debe estar ACTIVO
+    if (sunatData.estado !== 'ACTIVO') {
+      return {
+        valido: false,
+        data: sunatData,
+        error: `El RUC tiene estado "${sunatData.estado}". Solo se aceptan contribuyentes con estado ACTIVO.`,
+        codigo: 'NO_ACTIVO',
+      };
+    }
+
+    // Regla 2: Debe estar HABIDO
+    if (sunatData.condicion !== 'HABIDO') {
+      return {
+        valido: false,
+        data: sunatData,
+        error: `El RUC tiene condición "${sunatData.condicion}". Solo se aceptan contribuyentes con condición HABIDO.`,
+        codigo: 'NO_HABIDO',
+      };
+    }
+
+    // Regla 3: Ámbito geográfico — Solo Provincia de Trujillo, Departamento La Libertad
+    const esDepartamentoValido =
+      sunatData.departamento === 'LA LIBERTAD' ||
+      sunatData.departamento.includes('LIBERTAD');
+
+    const esProvinciaValida = sunatData.provincia === 'TRUJILLO';
+
+    if (!esDepartamentoValido || !esProvinciaValida) {
+      return {
+        valido: false,
+        data: sunatData,
+        error: `El domicilio fiscal del RUC se encuentra en ${sunatData.provincia}, ${sunatData.departamento}. Este servicio es exclusivo para negocios con domicilio fiscal en la Provincia de Trujillo, Departamento La Libertad.`,
+        codigo: 'FUERA_DE_TRUJILLO',
+      };
+    }
+
+    return {
+      valido: true,
+      data: sunatData,
+    };
+  } catch (error) {
+    console.error('[RucPeru] Error al consultar RUC:', error);
+    return {
+      valido: false,
+      error: 'Error al conectar con el servicio de consulta de RUC. Intente nuevamente.',
+      codigo: 'API_ERROR',
+    };
+  }
+}

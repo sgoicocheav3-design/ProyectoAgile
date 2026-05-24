@@ -1,19 +1,7 @@
-import { redirect } from 'next/navigation';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
 import Link from 'next/link';
-import { Building2, Shield, Users, BarChart3 } from 'lucide-react';
+import { Building2, Shield, Search, FileText, CreditCard, ClipboardCheck } from 'lucide-react';
 
-export default async function HomePage() {
-  const session = await getServerSession(authOptions);
-
-  // Redirigir según rol si ya tiene sesión
-  if (session) {
-    if (session.user.rol === 'INSPECTOR') redirect('/inspector/agenda');
-    if (session.user.rol === 'ADMINISTRADOR') redirect('/admin/dashboard');
-    redirect('/contribuyente/dashboard');
-  }
-
+export default function HomePage() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900">
       {/* Header */}
@@ -32,20 +20,13 @@ export default async function HomePage() {
               </h1>
             </div>
           </div>
-          <div className="flex gap-3">
-            <Link
-              href="/login"
-              className="px-4 py-2 text-white border border-white/30 rounded-lg hover:bg-white/10 transition text-sm font-medium"
-            >
-              Iniciar Sesión
-            </Link>
-            <Link
-              href="/registro"
-              className="px-4 py-2 bg-yellow-400 text-blue-900 rounded-lg hover:bg-yellow-300 transition text-sm font-bold"
-            >
-              Registrarse
-            </Link>
-          </div>
+          <Link
+            href="/login"
+            className="px-4 py-2 text-blue-300 border border-blue-500/30 rounded-lg hover:bg-white/10 transition text-sm font-medium"
+            id="btn-login-inspector"
+          >
+            🔑 Soy Inspector / Admin
+          </Link>
         </div>
       </header>
 
@@ -56,91 +37,88 @@ export default async function HomePage() {
           <span className="text-yellow-300 text-sm font-medium">Sistema 100% Digital y Automatizado</span>
         </div>
         <h2 className="text-5xl font-black text-white mb-6 leading-tight">
-          Obtén tu Licencia Municipal<br />
-          <span className="text-yellow-400">desde cualquier lugar</span>
+          Licencia de Funcionamiento<br />
+          <span className="text-yellow-400">Municipal de Trujillo</span>
         </h2>
         <p className="text-blue-200 text-xl max-w-2xl mx-auto mb-10">
-          Tramita tu Licencia de Funcionamiento de forma 100% digital.
-          Validación SUNAT en tiempo real, pago seguro y seguimiento en línea.
+          Solicita tu Licencia de Funcionamiento de forma 100% digital.
+          Sin colas, sin papeleos innecesarios.
         </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+
+        {/* Botones principales */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6">
           <Link
-            href="/registro"
-            className="px-8 py-4 bg-yellow-400 text-blue-900 rounded-xl font-bold text-lg hover:bg-yellow-300 transition-all shadow-lg hover:shadow-yellow-400/30 hover:-translate-y-0.5"
+            href="/solicitud"
+            className="px-10 py-5 bg-yellow-400 text-blue-900 rounded-2xl font-black text-xl hover:bg-yellow-300 transition-all shadow-lg hover:shadow-yellow-400/30 hover:-translate-y-1 flex items-center justify-center gap-3"
+            id="btn-iniciar-solicitud"
           >
-            Iniciar Trámite →
-          </Link>
-          <Link
-            href="/login"
-            className="px-8 py-4 bg-white/10 text-white rounded-xl font-semibold text-lg hover:bg-white/20 transition-all border border-white/20"
-          >
-            Ya tengo cuenta
+            <FileText className="w-6 h-6" />
+            Iniciar Solicitud de Licencia
           </Link>
         </div>
+
+        <Link
+          href="/consulta"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-white/10 text-white rounded-xl font-semibold hover:bg-white/20 transition-all border border-white/20"
+          id="btn-consultar-estado"
+        >
+          <Search className="w-5 h-5" />
+          Consultar Estado de mi Trámite
+        </Link>
       </section>
 
-      {/* Features */}
-      <section className="max-w-6xl mx-auto px-4 pb-20">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Proceso */}
+      <section className="max-w-6xl mx-auto px-4 pb-16">
+        <h3 className="text-white font-black text-3xl text-center mb-12">
+          ¿Cómo funciona?
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
           {[
-            {
-              icon: <Building2 className="w-8 h-8" />,
-              title: 'Validación SUNAT Real',
-              desc: 'Tu RUC se verifica en tiempo real contra la base de datos de SUNAT. Solo negocios activos y habidos en Trujillo.',
-              color: 'from-blue-500 to-blue-600',
-            },
-            {
-              icon: <Shield className="w-8 h-8" />,
-              title: 'Pago Seguro Integrado',
-              desc: 'Pasarela de pago certificada por S/. 180.00. Recibe confirmación instantánea y agenda tu inspección automáticamente.',
-              color: 'from-emerald-500 to-emerald-600',
-            },
-            {
-              icon: <BarChart3 className="w-8 h-8" />,
-              title: 'Licencia PDF con QR',
-              desc: 'Una vez aprobado, descarga tu licencia oficial en PDF con código QR único verificable. Vigencia de 1 año.',
-              color: 'from-purple-500 to-purple-600',
-            },
-          ].map((f, i) => (
+            { icon: <Search className="w-8 h-8" />, n: '1', label: 'Valida tu RUC', desc: 'Verificamos en SUNAT que tu negocio esté activo y habido en Trujillo.', color: 'from-blue-500 to-blue-600' },
+            { icon: <FileText className="w-8 h-8" />, n: '2', label: 'Sube documentos', desc: 'Adjunta el plano de tu local en PDF o imagen.', color: 'from-emerald-500 to-emerald-600' },
+            { icon: <CreditCard className="w-8 h-8" />, n: '3', label: 'Paga S/. 180', desc: 'Pago seguro por MercadoPago. Inspección se agenda automáticamente.', color: 'from-purple-500 to-purple-600' },
+            { icon: <ClipboardCheck className="w-8 h-8" />, n: '4', label: 'Recibe tu licencia', desc: 'Tras la inspección aprobada, descarga tu licencia PDF con QR.', color: 'from-orange-500 to-orange-600' },
+          ].map((step, i) => (
             <div
               key={i}
-              className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all animate-fade-in"
+              className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all text-center animate-fade-in"
               style={{ animationDelay: `${i * 100}ms` }}
             >
-              <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${f.color} flex items-center justify-center text-white mb-4`}>
-                {f.icon}
+              <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${step.color} flex items-center justify-center text-white mx-auto mb-4`}>
+                {step.icon}
               </div>
-              <h3 className="text-white font-bold text-lg mb-2">{f.title}</h3>
-              <p className="text-blue-200 text-sm leading-relaxed">{f.desc}</p>
+              <div className="w-8 h-8 rounded-full bg-yellow-400 text-blue-900 font-black text-lg flex items-center justify-center mx-auto mb-3">
+                {step.n}
+              </div>
+              <h4 className="text-white font-bold text-lg mb-2">{step.label}</h4>
+              <p className="text-blue-200 text-sm leading-relaxed">{step.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Proceso */}
-      <section className="bg-blue-950/40 border-t border-blue-700/30 py-16">
-        <div className="max-w-5xl mx-auto px-4">
-          <h3 className="text-white font-black text-3xl text-center mb-12">
-            ¿Cómo funciona el proceso?
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {[
-              { n: '1', label: 'Valida tu RUC' },
-              { n: '2', label: 'Sube tu plano' },
-              { n: '3', label: 'Paga S/. 180' },
-              { n: '4', label: 'Inspección técnica' },
-              { n: '5', label: 'Descarga licencia' },
-            ].map((step, i) => (
-              <div key={i} className="text-center">
-                <div className="w-12 h-12 rounded-full bg-yellow-400 text-blue-900 font-black text-xl flex items-center justify-center mx-auto mb-2">
-                  {step.n}
-                </div>
-                <p className="text-blue-200 text-sm font-medium">{step.label}</p>
-                {i < 4 && (
-                  <div className="hidden md:block absolute mt-[-28px] ml-[64px] text-yellow-400 font-bold text-xl">→</div>
-                )}
-              </div>
-            ))}
+      {/* Info */}
+      <section className="bg-blue-950/40 border-t border-blue-700/30 py-12">
+        <div className="max-w-4xl mx-auto px-4 text-center">
+          <h3 className="text-white font-bold text-xl mb-4">¿Ya tienes una solicitud en proceso?</h3>
+          <p className="text-blue-200 mb-6">
+            Ingresa tu número de RUC en la sección de consulta para ver el estado actual de tu trámite.
+            Si ya creaste una cuenta durante tu solicitud, puedes ingresar desde el botón de login.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              href="/consulta"
+              className="px-6 py-3 bg-white/10 text-white rounded-xl font-medium hover:bg-white/20 transition border border-white/20 flex items-center justify-center gap-2"
+            >
+              <Search className="w-4 h-4" />
+              Consultar con mi RUC
+            </Link>
+            <Link
+              href="/login"
+              className="px-6 py-3 text-blue-300 hover:text-white transition text-sm flex items-center justify-center gap-2"
+            >
+              Iniciar sesión (contribuyentes con cuenta)
+            </Link>
           </div>
         </div>
       </section>

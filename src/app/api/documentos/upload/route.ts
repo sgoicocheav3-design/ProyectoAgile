@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { onDocumentosCargados } from '@/lib/tramite-machine';
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-  }
-
   // Inicialización lazy del cliente Supabase (solo en runtime, no en build)
   const { createClient } = await import('@supabase/supabase-js');
   const supabase = createClient(
@@ -37,14 +30,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'El archivo no debe superar 10 MB.' }, { status: 400 });
   }
 
-  // Verificar que el trámite pertenezca al usuario
+  // Verificar que el trámite exista (no requiere auth, valida por tramiteId)
   const tramite = await prisma.tramite.findUnique({
     where: { id: tramiteId },
     include: { negocio: true },
   });
 
-  if (!tramite || tramite.negocio.usuarioId !== session.user.id) {
-    return NextResponse.json({ error: 'Sin autorización para este trámite.' }, { status: 403 });
+  if (!tramite) {
+    return NextResponse.json({ error: 'Trámite no encontrado.' }, { status: 404 });
   }
 
   // Subir a Supabase Storage

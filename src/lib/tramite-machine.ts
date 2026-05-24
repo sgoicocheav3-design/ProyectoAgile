@@ -27,7 +27,7 @@ const TRANSICIONES_VALIDAS: Record<EstadoTramite, EstadoTramite[]> = {
   OBSERVADO: ['SEGUNDA_INSPECCION'],
   SEGUNDA_INSPECCION: ['APROBADO', 'NEGADO'],
   APROBADO: [], // Estado terminal — solo renovación crea trámite nuevo
-  NEGADO: [],   // Estado terminal — debe reiniciar con pago nuevo
+  NEGADO: [],   // Estado terminal — negocio puede iniciar nuevo trámite
 };
 
 /**
@@ -311,7 +311,7 @@ export async function onResultadoInspeccion(
     }
 
     const ahora = new Date();
-    const motivoNegado = `Visita #2 rechazada. Observaciones: ${observaciones}`;
+    const motivoNegado = `Segunda inspección no conforme. Observaciones: ${observaciones}`;
 
     await prisma.$transaction(async (tx) => {
       // Marcar inspección #2 como rechazada
@@ -326,7 +326,7 @@ export async function onResultadoInspeccion(
         },
       });
 
-      // NEGADO DEFINITIVO — proceso muere aquí
+      // Solicitud rechazada — negocio puede iniciar nuevo trámite
       await tx.tramite.update({
         where: { id: tramite.id },
         data: {
@@ -340,7 +340,7 @@ export async function onResultadoInspeccion(
       exito: true,
       nuevoEstado: 'NEGADO',
       datos: {
-        mensaje: 'El trámite ha sido NEGADO DEFINITIVAMENTE. Para reintentar, debe iniciar un nuevo trámite y realizar el pago de S/. 180.00.',
+        mensaje: 'La solicitud ha sido RECHAZADA. Puede iniciar un nuevo trámite con una nueva solicitud y pago de S/. 180.00.',
         motivoNegado,
       },
     };
