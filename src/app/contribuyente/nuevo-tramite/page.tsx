@@ -19,7 +19,9 @@ export default function NuevoTramitePage() {
   const router = useRouter();
 
   const [step, setStep] = useState<Step>(1);
+  const [searchMode, setSearchMode] = useState<'ruc' | 'dni'>('ruc'); // Nuevo: modo de búsqueda
   const [ruc, setRuc] = useState('');
+  const [dni, setDni] = useState(''); // Nuevo: campo DNI
   const [negocio, setNegocio] = useState<NegocioData | null>(null);
   const [negocioId, setNegocioId] = useState('');
   const [tramiteId, setTramiteId] = useState('');
@@ -29,32 +31,61 @@ export default function NuevoTramitePage() {
   const [paymentUrl, setPaymentUrl] = useState('');
 
   // ─────────────────────────────────────────
-  // PASO 1: Validar RUC
+  // PASO 1: Validar RUC o DNI
   // ─────────────────────────────────────────
   const validarRUC = async () => {
-    if (ruc.length !== 11) {
-      setError('El RUC debe tener exactamente 11 dígitos.');
-      return;
-    }
     setLoading(true);
     setError('');
 
-    const res = await fetch(`/api/sunat/ruc?ruc=${ruc}`);
-    const data = await res.json();
+    let res, data;
+
+    if (searchMode === 'ruc') {
+      // Búsqueda por RUC
+      if (ruc.length !== 11) {
+        setError('El RUC debe tener exactamente 11 dígitos.');
+        setLoading(false);
+        return;
+      }
+
+      res = await fetch(`/api/sunat/ruc?ruc=${ruc}`);
+      data = await res.json();
+    } else {
+      // Búsqueda por DNI (usando rucperu.com)
+      if (dni.length !== 8) {
+        setError('El DNI debe tener exactamente 8 dígitos.');
+        setLoading(false);
+        return;
+      }
+
+      res = await fetch('/api/sunat/dni', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dni }),
+      });
+      data = await res.json();
+    }
 
     if (!res.ok || !data.valido) {
-      setError(data.error || 'RUC no válido.');
+      setError(data.error || 'Validación fallida.');
       setLoading(false);
       return;
     }
 
-    setNegocio(data.data);
+    const negocioData = searchMode === 'ruc' ? data.data : data;
+
+    if (!negocioData || !negocioData.ruc) {
+      setError('No se pudo recuperar la información del negocio.');
+      setLoading(false);
+      return;
+    }
+
+    setNegocio(negocioData);
 
     // Registrar negocio en BD
     const regRes = await fetch('/api/sunat/ruc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ruc }),
+      body: JSON.stringify({ ruc: negocioData.ruc }),
     });
     const regData = await regRes.json();
 
@@ -101,27 +132,31 @@ export default function NuevoTramitePage() {
     setLoading(true);
     setError('');
 
-    // Subir archivo a Supabase Storage via API
-    const formData = new FormData();
-    formData.append('file', planoFile);
-    formData.append('tramiteId', tramiteId);
-    formData.append('tipo', 'PLANO_LOCAL');
+    try {
+      const formData = new FormData();
+      formData.append('file', planoFile);
+      formData.append('tramiteId', tramiteId);
+      formData.append('tipo', 'PLANO_LOCAL');
 
-    const res = await fetch('/api/documentos/upload', {
-      method: 'POST',
-      body: formData,
-    });
+      const res = await fetch('/api/documentos/upload', {
+        method: 'POST',
+        body: formData,
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (!res.ok) {
-      setError(data.error || 'Error al subir el plano.');
+      if (!res.ok) {
+        setError(data.error || 'Error al subir el plano.');
+        setLoading(false);
+        return;
+      }
+
+      setStep(3);
       setLoading(false);
-      return;
+    } catch {
+      setError('Error de conexión al subir el archivo.');
+      setLoading(false);
     }
-
-    setStep(3);
-    setLoading(false);
   };
 
   // ─────────────────────────────────────────
@@ -131,22 +166,27 @@ export default function NuevoTramitePage() {
     setLoading(true);
     setError('');
 
-    const res = await fetch('/api/pagos/crear-preferencia', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tramiteId }),
-    });
+    try {
+      const res = await fetch('/api/pagos/crear-preferencia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tramiteId }),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (!res.ok) {
-      setError(data.error || 'Error al crear el pago.');
+      if (!res.ok) {
+        setError(data.error || 'Error al crear el pago.');
+        setLoading(false);
+        return;
+      }
+
+      // En sandbox usar sandboxInitPoint, en producción usar initPoint
+      window.location.href = data.sandboxInitPoint || data.initPoint;
+    } catch {
+      setError('Error de conexión. Intente nuevamente.');
       setLoading(false);
-      return;
     }
-
-    // En sandbox usar sandboxInitPoint, en producción usar initPoint
-    window.location.href = data.sandboxInitPoint || data.initPoint;
   };
 
   const steps = [
@@ -196,34 +236,97 @@ export default function NuevoTramitePage() {
             </div>
           )}
 
-          {/* STEP 1: RUC */}
+          {/* STEP 1: RUC o DNI */}
           {step === 1 && (
             <div>
-              <h2 className="font-bold text-xl text-gray-800 mb-1">Paso 1: Validar RUC</h2>
+              <h2 className="font-bold text-xl text-gray-800 mb-1">Paso 1: Validar Negocio</h2>
               <p className="text-gray-500 text-sm mb-6">
-                Ingrese el RUC de su negocio. Verificaremos en tiempo real que esté activo, habido y con domicilio fiscal en la provincia de Trujillo.
+                Ingrese el RUC de su negocio o el DNI del propietario. Verificaremos en tiempo real que esté activo, habido y con domicilio fiscal en la provincia de Trujillo.
               </p>
-              <div className="flex gap-3">
-                <input
-                  type="text"
-                  value={ruc}
-                  onChange={(e) => setRuc(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                  placeholder="Ej: 20600000000"
-                  maxLength={11}
-                  className="input-base flex-1 font-mono text-lg tracking-wider"
-                  id="input-ruc"
-                />
-                <button onClick={validarRUC} disabled={loading || ruc.length !== 11} id="btn-validar-ruc" className="btn-primary flex items-center gap-2">
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                  Validar
+
+              {/* Selector de modo de búsqueda */}
+              <div className="mb-6 flex gap-3">
+                <button
+                  onClick={() => {
+                    setSearchMode('ruc');
+                    setDni('');
+                    setError('');
+                  }}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    searchMode === 'ruc'
+                      ? 'bg-blue-700 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Buscar por RUC
                 </button>
+                <button
+                  onClick={() => {
+                    setSearchMode('dni');
+                    setRuc('');
+                    setError('');
+                  }}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    searchMode === 'dni'
+                      ? 'bg-blue-700 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Buscar por DNI
+                </button>
+              </div>
+
+              <div className="flex gap-3">
+                {searchMode === 'ruc' ? (
+                  <>
+                    <input
+                      type="text"
+                      value={ruc}
+                      onChange={(e) => setRuc(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                      placeholder="Ej: 20600000000"
+                      maxLength={11}
+                      className="input-base flex-1 font-mono text-lg tracking-wider"
+                      id="input-ruc"
+                    />
+                    <button
+                      onClick={validarRUC}
+                      disabled={loading || ruc.length !== 11}
+                      id="btn-validar-ruc"
+                      className="btn-primary flex items-center gap-2"
+                    >
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                      Validar
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={dni}
+                      onChange={(e) => setDni(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                      placeholder="Ej: 12345678"
+                      maxLength={8}
+                      className="input-base flex-1 font-mono text-lg tracking-wider"
+                      id="input-dni"
+                    />
+                    <button
+                      onClick={validarRUC}
+                      disabled={loading || dni.length !== 8}
+                      id="btn-validar-dni"
+                      className="btn-primary flex items-center gap-2"
+                    >
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                      Validar
+                    </button>
+                  </>
+                )}
               </div>
 
               {negocio && (
                 <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg animate-fade-in">
                   <div className="flex items-center gap-2 mb-2">
                     <CheckCircle2 className="w-5 h-5 text-green-600" />
-                    <span className="font-semibold text-green-800">RUC Válido — Negocio Verificado</span>
+                    <span className="font-semibold text-green-800">Negocio Verificado</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm mt-2">
                     <div><span className="text-gray-500">Razón Social:</span> <strong className="text-gray-800">{negocio.razonSocial}</strong></div>
@@ -307,7 +410,13 @@ export default function NuevoTramitePage() {
               </div>
 
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6 text-sm text-yellow-800">
-                <strong>⚠ Entorno Sandbox:</strong> Use la tarjeta de prueba <code className="bg-yellow-100 px-1 rounded">4509 9535 6623 3704</code> — Vencimiento: cualquier fecha futura — CVV: cualquier 3 dígitos.
+                <strong>⚠ Entorno Sandbox:</strong> Use estas tarjetas de prueba:
+                <div className="mt-2 space-y-1">
+                  <p><strong>Visa:</strong> <code className="bg-yellow-100 px-1 rounded">4009 1753 3280 6176</code> — CVV: 123 — Vto: 11/30</p>
+                  <p><strong>Mastercard:</strong> <code className="bg-yellow-100 px-1 rounded">5031 7557 3453 0604</code> — CVV: 123 — Vto: 11/30</p>
+                  <p><strong>Amex:</strong> <code className="bg-yellow-100 px-1 rounded">3711 803032 57522</code> — CVV: 1234 — Vto: 11/30</p>
+                  <p className="text-xs text-yellow-600 mt-1">Nombre: APRO (o cualquier nombre) — Monto: S/. 180.00</p>
+                </div>
               </div>
 
               <div className="flex gap-3">

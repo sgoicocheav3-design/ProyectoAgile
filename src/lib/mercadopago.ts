@@ -53,7 +53,6 @@ export async function crearPreferenciaPago(
         failure: `${appUrl}/contribuyente/tramite/${input.tramiteId}?pago=failure`,
         pending: `${appUrl}/contribuyente/tramite/${input.tramiteId}?pago=pending`,
       },
-      auto_return: 'approved',
       notification_url: `${appUrl}/api/pagos/webhook`,
       statement_descriptor: 'MPT LICENCIAS',
     },

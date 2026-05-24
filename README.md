@@ -153,6 +153,7 @@ fechas_no_habiles   (id, fecha, motivo)  -- Para cálculo de 30 días hábiles
 |--------|----------|-------------|-----|
 | GET | `/api/sunat/ruc?ruc=20XXXXXXXXX` | Consulta RUC en SUNAT | Todos |
 | POST | `/api/sunat/ruc` | Registra negocio validado | Contribuyente |
+| POST | `/api/sunat/dni` | Busca RUC por DNI (rucperu.com) | Contribuyente |
 | POST | `/api/tramites` | Inicia nuevo trámite | Contribuyente |
 | GET | `/api/tramites` | Lista mis trámites | Contribuyente |
 | POST | `/api/pagos/crear-preferencia` | Crea checkout MercadoPago | Contribuyente |

@@ -1,6 +1,6 @@
 /**
- * Cliente de integración con ApisPerú para validación de RUC
- * Documentación: https://apis.net.pe/api-ruc.html
+ * Validación de RUC con scraper de rucperu.com como fuente primaria
+ * y ApisPerú como fallback secundario
  */
 
 export interface SunatRucData {
@@ -182,7 +182,7 @@ function validarDigitoRUC(ruc: string): boolean {
 
 /**
  * Consulta RUC usando el scraper de rucperu.com
- * Alternativa cuando ApisPerú no está disponible
+ * Fuente principal de datos (evita el uso de APIs de terceros)
  */
 export async function consultarRucConRucPeru(
   ruc: string
@@ -212,7 +212,7 @@ export async function consultarRucConRucPeru(
     if (!rucData) {
       return {
         valido: false,
-        error: 'RUC no encontrado en rucperu.com',
+        error: 'No se pudo obtener información del RUC desde rucperu.com. Verifique que el RUC exista en SUNAT.',
         codigo: 'RUC_INVALIDO',
       };
     }

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { consultarRUC } from '@/lib/sunat';
+import { consultarRucConRucPeru } from '@/lib/sunat';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
 /**
  * GET /api/sunat/ruc?ruc=20600000000
- * Consulta el RUC en SUNAT y valida las reglas de negocio
+ * Consulta el RUC via rucperu.com y valida las reglas de negocio
  * Si ya existe en BD, retorna los datos cacheados
  */
 export async function GET(request: NextRequest) {
@@ -51,8 +51,8 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Consultar SUNAT en tiempo real
-  const resultado = await consultarRUC(ruc);
+  // Consultar via rucperu.com (única fuente, no usa APIs externas)
+  const resultado = await consultarRucConRucPeru(ruc);
 
   if (!resultado.valido) {
     return NextResponse.json(
@@ -89,8 +89,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'RUC es requerido.' }, { status: 400 });
   }
 
-  // Re-validar con SUNAT (no confiar en datos del cliente)
-  const resultado = await consultarRUC(ruc);
+  // Re-validar con rucperu.com (no confiar en datos del cliente)
+  const resultado = await consultarRucConRucPeru(ruc);
 
   if (!resultado.valido || !resultado.data) {
     return NextResponse.json(

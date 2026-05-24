@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 1. Validar con rucperu.com
+  // 1. Validar RUC via rucperu.com (única fuente)
   const resultado = await consultarRucConRucPeru(ruc);
 
   if (!resultado.valido || !resultado.data) {

@@ -93,26 +93,31 @@ export default function SolicitudPage() {
     setLoading(true);
     setError('');
 
-    const formData = new FormData();
-    formData.append('file', planoFile);
-    formData.append('tramiteId', tramiteId);
-    formData.append('tipo', 'PLANO_LOCAL');
+    try {
+      const formData = new FormData();
+      formData.append('file', planoFile);
+      formData.append('tramiteId', tramiteId);
+      formData.append('tipo', 'PLANO_LOCAL');
 
-    const res = await fetch('/api/documentos/upload', {
-      method: 'POST',
-      body: formData,
-    });
+      const res = await fetch('/api/documentos/upload', {
+        method: 'POST',
+        body: formData,
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (!res.ok) {
-      setError(data.error || 'Error al subir el plano.');
+      if (!res.ok) {
+        setError(data.error || 'Error al subir el plano.');
+        setLoading(false);
+        return;
+      }
+
+      setStep(3);
       setLoading(false);
-      return;
+    } catch {
+      setError('Error de conexión al subir el archivo.');
+      setLoading(false);
     }
-
-    setStep(3);
-    setLoading(false);
   };
 
   // ─────────────────────────────────────────
@@ -122,22 +127,27 @@ export default function SolicitudPage() {
     setLoading(true);
     setError('');
 
-    const res = await fetch('/api/pagos/crear-preferencia', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tramiteId }),
-    });
+    try {
+      const res = await fetch('/api/pagos/crear-preferencia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tramiteId }),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (!res.ok) {
-      setError(data.error || 'Error al crear el pago.');
+      if (!res.ok) {
+        setError(data.error || 'Error al crear el pago.');
+        setLoading(false);
+        return;
+      }
+
+      // Redirigir a MercadoPago
+      window.location.href = data.sandboxInitPoint || data.initPoint;
+    } catch {
+      setError('Error de conexión. Intente nuevamente.');
       setLoading(false);
-      return;
     }
-
-    // Redirigir a MercadoPago
-    window.location.href = data.sandboxInitPoint || data.initPoint;
   };
 
   // ─────────────────────────────────────────
@@ -337,7 +347,13 @@ export default function SolicitudPage() {
               </div>
 
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6 text-sm text-yellow-800">
-                <strong>⚠ Entorno de Pruebas:</strong> Use la tarjeta <code className="bg-yellow-100 px-1 rounded">4509 9535 6623 3704</code> — Vencimiento: cualquier fecha futura — CVV: 123 — Nombre: APRO
+                <strong>⚠ Entorno Sandbox:</strong> Use estas tarjetas de prueba:
+                <div className="mt-2 space-y-1">
+                  <p><strong>Visa:</strong> <code className="bg-yellow-100 px-1 rounded">4009 1753 3280 6176</code> — CVV: 123 — Vto: 11/30</p>
+                  <p><strong>Mastercard:</strong> <code className="bg-yellow-100 px-1 rounded">5031 7557 3453 0604</code> — CVV: 123 — Vto: 11/30</p>
+                  <p><strong>Amex:</strong> <code className="bg-yellow-100 px-1 rounded">3711 803032 57522</code> — CVV: 1234 — Vto: 11/30</p>
+                  <p className="text-xs text-yellow-600 mt-1">Nombre: APRO (o cualquier nombre) — Monto: S/. 180.00</p>
+                </div>
               </div>
 
               <div className="flex gap-3">
