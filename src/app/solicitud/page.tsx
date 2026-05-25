@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import axios from 'axios';
 import {
   Search, CheckCircle2, AlertCircle, Upload,
   Loader2, ArrowLeft, Shield, UserPlus, Mail, ExternalLink
@@ -54,15 +55,12 @@ export default function SolicitudPage() {
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
   const MIN_FILE_SIZE = 10 * 1024; // 10 KB — evitar archivos vacíos
 
-  const fileToBase64 = (file: File): Promise<string> => {
+  const loadImageBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        resolve(result.split(',')[1]);
-      };
-      reader.onerror = reject;
       reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
     });
   };
 
@@ -73,22 +71,40 @@ export default function SolicitudPage() {
     setPlanoValidationError(null);
 
     try {
-      const base64 = await fileToBase64(planoFile);
-      const res = await fetch('/api/validar-plano', {
+      const imageBase64 = await loadImageBase64(planoFile);
+
+      const response = await axios({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, mimeType: planoFile.type }),
+        url: 'https://serverless.roboflow.com/architectural-blueprint/2',
+        params: {
+          api_key: process.env.NEXT_PUBLIC_ROBOFLOW_API_KEY || 'dL3elWTQDy5dakUOlfr',
+        },
+        data: imageBase64,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
       });
-      const data = await res.json();
 
-      if (!res.ok) {
-        setPlanoValidationError(data.error || 'Error al validar el plano.');
-        return;
+      const detections = response.data?.predictions;
+
+      if (detections && detections.length > 0) {
+        const top = detections[0];
+        setPlanoValidation({
+          isPlan: true,
+          confidence: Math.round(top.confidence * 100),
+          reason: `Se detectaron ${detections.length} elementos arquitectónicos (${top.class} con ${(top.confidence * 100).toFixed(0)}% de confianza).`,
+        });
+      } else {
+        setPlanoValidation({
+          isPlan: false,
+          confidence: 0,
+          reason: 'El modelo no detectó elementos de un plano arquitectónico.',
+        });
       }
-
-      setPlanoValidation(data);
-    } catch {
-      setPlanoValidationError('Error de conexión al validar el plano.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error desconocido';
+      console.error('Error validando con Roboflow:', message);
+      setPlanoValidationError('Error de conexión al validar el plano con Roboflow.');
     } finally {
       setIsValidandoPlano(false);
     }
@@ -450,7 +466,7 @@ export default function SolicitudPage() {
                   id="btn-validar-plano"
                 >
                   <Search className="w-4 h-4" />
-                  Validar Plano con IA
+                  Validar Plano
                 </button>
               )}
 
