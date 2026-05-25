@@ -110,8 +110,6 @@ export default function SolicitudPage() {
         setLoading(false);
         return;
       }
-
-      setStep(2);
     } catch {
       setError('Error de conexión. Intente nuevamente.');
     }
@@ -346,6 +344,14 @@ export default function SolicitudPage() {
                     <div className="col-span-2"><span className="text-gray-500">Domicilio:</span> <strong className="text-gray-800">{negocio.domicilioFiscal}</strong></div>
                     <div><span className="text-gray-500">Provincia:</span> <strong className="text-gray-800">{negocio.provincia}</strong></div>
                   </div>
+                  <button
+                    onClick={() => setStep(2)}
+                    className="btn-primary w-full mt-4 flex items-center justify-center gap-2"
+                    id="btn-confirmar-ruc"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    ¿Este es tu RUC? — Continuar
+                  </button>
                 </div>
               )}
             </div>

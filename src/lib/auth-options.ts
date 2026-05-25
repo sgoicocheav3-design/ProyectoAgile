@@ -1,6 +1,7 @@
 import NextAuth, { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { prisma } from '@/lib/prisma';
+import { env } from '@/lib/env';
 import bcrypt from 'bcryptjs';
 import { RolUsuario } from '@prisma/client';
 
@@ -92,5 +93,5 @@ export const authOptions: NextAuthOptions = {
     signIn: '/login',
     error: '/login',
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: env.NEXTAUTH_SECRET,
 };

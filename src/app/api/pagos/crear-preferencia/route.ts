@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { crearPreferenciaPago } from '@/lib/mercadopago';
+import { crearPreferenciaPago, MONTO_LICENCIA } from '@/lib/mercadopago';
 
 /**
  * POST /api/pagos/crear-preferencia
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     : await prisma.pago.create({
         data: {
           tramiteId,
-          monto: 1.80,
+          monto: MONTO_LICENCIA,
           preferenceId: preferencia.preferenceId,
           estadoPago: 'PENDIENTE',
           esRenovacion: tramite.esRenovacion,
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     pagoId: pago.id,
     preferenceId: preferencia.preferenceId,
     initPoint: preferencia.initPoint,
-    monto: 1.80,
+    monto: MONTO_LICENCIA,
     moneda: 'PEN',
   });
 }

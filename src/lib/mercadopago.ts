@@ -1,7 +1,4 @@
-/**
- * Cliente MercadoPago para producción peruana
- * Usa credenciales APP_USR- (no TEST-)
- */
+import { env } from '@/lib/env';
 
 export interface PreferenciaPagoInput {
   tramiteId: string;
@@ -24,7 +21,7 @@ export interface YapePaymentData {
   estado: string;
 }
 
-const MONTO_LICENCIA = 1.80; // Monto fijo bloqueado del lado servidor (real: 180.00)
+export const MONTO_LICENCIA = 1.80;
 
 export async function crearPreferenciaPago(
   input: PreferenciaPagoInput
@@ -32,12 +29,12 @@ export async function crearPreferenciaPago(
   const { MercadoPagoConfig, Preference } = await import('mercadopago');
 
   const client = new MercadoPagoConfig({
-    accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN!,
+    accessToken: env.MERCADOPAGO_ACCESS_TOKEN,
   });
 
   const preference = new Preference(client);
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const appUrl = env.NEXT_PUBLIC_APP_URL;
 
   const result = await preference.create({
     body: {
@@ -75,7 +72,7 @@ export async function crearPreferenciaPago(
 
 /**
  * Crea un pago Yape con QR dinámico.
- * El monto se fija en el servidor (1.80 PEN) y no puede modificarse desde el cliente.
+ * El monto se fija en el servidor y no puede modificarse desde el cliente.
  * Retorna la imagen QR en Base64 para mostrar al usuario.
  */
 export async function crearPagoYapeQR(input: {
@@ -87,12 +84,12 @@ export async function crearPagoYapeQR(input: {
   const { MercadoPagoConfig, Payment } = await import('mercadopago');
 
   const client = new MercadoPagoConfig({
-    accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN!,
+    accessToken: env.MERCADOPAGO_ACCESS_TOKEN,
   });
 
   const payment = new Payment(client);
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const appUrl = env.NEXT_PUBLIC_APP_URL;
 
   const result = await payment.create({
     body: {
@@ -123,7 +120,7 @@ export async function verificarPago(paymentId: string) {
   const { MercadoPagoConfig, Payment } = await import('mercadopago');
 
   const client = new MercadoPagoConfig({
-    accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN!,
+    accessToken: env.MERCADOPAGO_ACCESS_TOKEN,
   });
 
   const payment = new Payment(client);

@@ -382,13 +382,18 @@ export async function iniciarRenovacion(
   }
 
   // Crear nuevo trámite de renovación (inicia en INICIADO, requiere nuevo pago)
+  const declaradoPor = usuarioId ?? tramiteOrigen.negocio.usuarioId;
+  if (!declaradoPor) {
+    return { exito: false, error: 'No se encontró un usuario responsable de la declaración.' };
+  }
+
   const nuevoTramite = await prisma.$transaction(async (tx) => {
     // Registrar declaración de infraestructura sin cambios
     await tx.historialInfraestructura.create({
       data: {
         tramiteId: tramiteOrigenId,
         tieneCambios: false,
-        declaradoPor: usuarioId || tramiteOrigen.negocio.usuarioId,
+        declaradoPor,
         aceptaTerminos: true,
       },
     });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { crearPagoYapeQR } from '@/lib/mercadopago';
+import { crearPagoYapeQR, MONTO_LICENCIA } from '@/lib/mercadopago';
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       : await prisma.pago.create({
           data: {
             tramiteId,
-            monto: 1.80,
+            monto: MONTO_LICENCIA,
             referenciaPasarela: String(yapeData.paymentId),
             estadoPago: 'PENDIENTE',
             esRenovacion: tramite.esRenovacion,
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       qrCodeBase64: yapeData.qrCodeBase64,
       qrCodeText: yapeData.qrCodeText,
       ticketUrl: yapeData.ticketUrl,
-      monto: 1.80,
+      monto: MONTO_LICENCIA,
       moneda: 'PEN',
     });
   } catch (error) {
