@@ -4,7 +4,7 @@ import { crearPreferenciaPago } from '@/lib/mercadopago';
 
 /**
  * POST /api/pagos/crear-preferencia
- * Crea una preferencia de pago en MercadoPago Sandbox
+ * Crea una preferencia de pago en MercadoPago (producción)
  * No requiere autenticación — valida por tramiteId
  */
 export async function POST(request: NextRequest) {
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     : await prisma.pago.create({
         data: {
           tramiteId,
-          monto: 180.00,
+          monto: 1.80,
           preferenceId: preferencia.preferenceId,
           estadoPago: 'PENDIENTE',
           esRenovacion: tramite.esRenovacion,
@@ -73,8 +73,7 @@ export async function POST(request: NextRequest) {
     pagoId: pago.id,
     preferenceId: preferencia.preferenceId,
     initPoint: preferencia.initPoint,
-    sandboxInitPoint: preferencia.sandboxInitPoint, // Para testing
-    monto: 180.00,
+    monto: 1.80,
     moneda: 'PEN',
   });
 }
