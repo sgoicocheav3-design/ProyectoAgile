@@ -18,14 +18,7 @@ const nextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.mercadopago.com https://*.mercadopago.com.pe",
-              "connect-src 'self' https://*.mercadopago.com https://*.mercadopago.com.pe",
-              "frame-src 'self' https://*.mercadopago.com https://*.mercadopago.com.pe",
-              "img-src 'self' data: blob: https://*.mercadopago.com https://*.mercadopago.com.pe",
-              "style-src 'self' 'unsafe-inline' https://*.mercadopago.com https://*.mercadopago.com.pe",
-            ].join('; '),
+            value: "default-src 'self' https://*.mercadopago.com https://*.mercadopago.com.pe; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.mercadopago.com https://*.mercadopago.com.pe; connect-src 'self' https://*.mercadopago.com https://*.mercadopago.com.pe; img-src 'self' data: blob: https://*.mercadopago.com https://*.mercadopago.com.pe; frame-src 'self' https://*.mercadopago.com https://*.mercadopago.com.pe; style-src 'self' 'unsafe-inline';",
           },
         ],
       },
