@@ -1,0 +1,71 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { crearPagoYapeQR } from '@/lib/mercadopago';
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { tramiteId, emailContacto } = body;
+
+    if (!tramiteId) {
+      return NextResponse.json({ error: 'tramiteId es requerido.' }, { status: 400 });
+    }
+
+    const tramite = await prisma.tramite.findUnique({
+      where: { id: tramiteId },
+      include: { negocio: true },
+    });
+
+    if (!tramite) {
+      return NextResponse.json({ error: 'Trámite no encontrado.' }, { status: 404 });
+    }
+
+    if (tramite.estado !== 'DOCUMENTOS_PENDIENTES') {
+      return NextResponse.json(
+        { error: `No se puede pagar en el estado actual: ${tramite.estado}.` },
+        { status: 422 }
+      );
+    }
+
+    const pagoExistente = await prisma.pago.findFirst({
+      where: { tramiteId, estadoPago: 'PENDIENTE' },
+    });
+
+    const yapeData = await crearPagoYapeQR({
+      tramiteId,
+      negocioRazonSocial: tramite.negocio.razonSocial,
+      ruc: tramite.negocio.ruc,
+      emailContacto,
+    });
+
+    const pago = pagoExistente
+      ? await prisma.pago.update({
+          where: { id: pagoExistente.id },
+          data: {
+            referenciaPasarela: String(yapeData.paymentId),
+          },
+        })
+      : await prisma.pago.create({
+          data: {
+            tramiteId,
+            monto: 1.80,
+            referenciaPasarela: String(yapeData.paymentId),
+            estadoPago: 'PENDIENTE',
+            esRenovacion: tramite.esRenovacion,
+          },
+        });
+
+    return NextResponse.json({
+      pagoId: pago.id,
+      paymentId: yapeData.paymentId,
+      qrCodeBase64: yapeData.qrCodeBase64,
+      qrCodeText: yapeData.qrCodeText,
+      ticketUrl: yapeData.ticketUrl,
+      monto: 1.80,
+      moneda: 'PEN',
+    });
+  } catch (error) {
+    console.error('[YAPE_QR] Error:', error);
+    return NextResponse.json({ error: 'Error al generar el pago Yape.' }, { status: 500 });
+  }
+}

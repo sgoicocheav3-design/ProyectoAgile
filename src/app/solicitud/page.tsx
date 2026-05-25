@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  Search, CheckCircle2, AlertCircle, Upload, CreditCard,
-  Loader2, ArrowRight, ArrowLeft, Shield, UserPlus, Mail
+  Search, CheckCircle2, AlertCircle, Upload,
+  Loader2, ArrowLeft, Shield, UserPlus, Mail, Smartphone, RefreshCw
 } from 'lucide-react';
 
 type Step = 1 | 2 | 3 | 4;
@@ -39,6 +39,42 @@ export default function SolicitudPage() {
 
   // Track si el negocio ya tiene usuario
   const [negocioYaTieneCuenta, setNegocioYaTieneCuenta] = useState(false);
+
+  // Anti-spam / concurrencia
+  const processingRef = useRef(false);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [yapeQr, setYapeQr] = useState<{
+    qrCodeBase64: string;
+    paymentId: number;
+    ticketUrl: string;
+  } | null>(null);
+  const [pagoConfirmado, setPagoConfirmado] = useState(false);
+  const [segundosRestantes, setSegundosRestantes] = useState(300);
+
+  const VALID_EXTENSIONS = ['pdf', 'png', 'jpg', 'jpeg'];
+  const VALID_MIME_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+  const MIN_FILE_SIZE = 10 * 1024; // 10 KB — evitar archivos vacíos
+
+  const validarPlano = (file: File | null): string | null => {
+    if (!file) return 'Debe seleccionar un archivo.';
+
+    if (file.size < MIN_FILE_SIZE) return 'El archivo está vacío o es demasiado pequeño.';
+    if (file.size > MAX_FILE_SIZE) return 'El archivo no debe superar 10 MB.';
+
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (!ext || !VALID_EXTENSIONS.includes(ext)) return 'Extensión de archivo no válida. Use PDF, PNG o JPG.';
+    if (!VALID_MIME_TYPES.includes(file.type)) return 'Tipo de archivo no válido. Use PDF, PNG o JPG.';
+
+    // Placeholder para validación con IA
+    // TODO: Conectar con API de IA para verificar que el archivo es un plano arquitectónico real
+    // Ej: enviar file a endpoint /api/validar-plano-ia que devuelva { valido: boolean, confianza: number }
+    // const esPlano = await validarConIA(file);
+    // if (!esPlano) return 'El archivo no parece ser un plano arquitectónico válido.';
+
+    return null;
+  };
 
   // ─────────────────────────────────────────
   // PASO 1: Validar RUC (público, sin auth)
@@ -86,16 +122,18 @@ export default function SolicitudPage() {
   // PASO 2: Subir plano (sin auth, usa tramiteId)
   // ─────────────────────────────────────────
   const subirPlano = async () => {
-    if (!planoFile) {
-      setError('Debe seleccionar el plano del local (PDF o imagen).');
+    const validacion = validarPlano(planoFile);
+    if (validacion) {
+      setError(validacion);
       return;
     }
+
     setLoading(true);
     setError('');
 
     try {
       const formData = new FormData();
-      formData.append('file', planoFile);
+      formData.append('file', planoFile!);
       formData.append('tramiteId', tramiteId);
       formData.append('tipo', 'PLANO_LOCAL');
 
@@ -121,34 +159,67 @@ export default function SolicitudPage() {
   };
 
   // ─────────────────────────────────────────
-  // PASO 3: Generar pago en MercadoPago
+  // PASO 3: Pago Yape con QR dinámico
   // ─────────────────────────────────────────
   const iniciarPago = async () => {
+    if (processingRef.current) return;
+    processingRef.current = true;
     setLoading(true);
     setError('');
 
     try {
-      const res = await fetch('/api/pagos/crear-preferencia', {
+      const res = await fetch('/api/pagos/crear-pago-yape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tramiteId }),
+        body: JSON.stringify({ tramiteId, emailContacto: email || undefined }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || 'Error al crear el pago.');
+        setError(data.error || 'Error al generar el pago Yape.');
         setLoading(false);
+        processingRef.current = false;
         return;
       }
 
-      // Redirigir a MercadoPago
-      window.location.href = data.sandboxInitPoint || data.initPoint;
+      setYapeQr({
+        qrCodeBase64: data.qrCodeBase64,
+        paymentId: data.paymentId,
+        ticketUrl: data.ticketUrl,
+      });
+      setSegundosRestantes(300);
+      setLoading(false);
+      processingRef.current = false;
     } catch {
       setError('Error de conexión. Intente nuevamente.');
       setLoading(false);
+      processingRef.current = false;
     }
   };
+
+  useEffect(() => {
+    if (!yapeQr || pagoConfirmado) return;
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/pagos/estado/${tramiteId}`);
+        const data = await res.json();
+        if (data.pagado) {
+          setPagoConfirmado(true);
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          setTimeout(() => setStep(4), 1500);
+        }
+      } catch {
+        // silently retry
+      }
+      setSegundosRestantes((prev) => (prev > 0 ? prev - 5 : 0));
+    }, 5000);
+
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [yapeQr, pagoConfirmado, tramiteId]);
 
   // ─────────────────────────────────────────
   // PASO 4: Crear cuenta post-pago
@@ -325,18 +396,18 @@ export default function SolicitudPage() {
             </div>
           )}
 
-          {/* STEP 3: Pago */}
-          {step === 3 && (
+          {/* STEP 3: Pago con Yape QR */}
+          {step === 3 && !yapeQr && !pagoConfirmado && (
             <div>
               <h2 className="font-bold text-xl text-gray-800 mb-1">Paso 3: Realizar Pago</h2>
               <p className="text-gray-500 text-sm mb-6">
-                El costo de la Licencia Municipal es de <strong className="text-gray-800">S/. 180.00</strong>.
-                Será redirigido a MercadoPago para completar el pago de forma segura.
+                El costo de la Licencia Municipal es de <strong className="text-gray-800">S/. 1.80</strong>.
+                Pague con Yape escaneando el código QR desde su celular.
               </p>
 
               <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-xl p-6 mb-6">
                 <p className="text-blue-200 text-sm mb-1">Monto a pagar</p>
-                <p className="text-5xl font-black mb-1">S/. 180.00</p>
+                <p className="text-5xl font-black mb-1">S/. 1.80</p>
                 <p className="text-blue-200 text-sm">Tasa de Licencia Municipal de Funcionamiento</p>
                 <hr className="border-blue-500 my-4" />
                 <div className="text-sm space-y-1">
@@ -346,23 +417,79 @@ export default function SolicitudPage() {
                 </div>
               </div>
 
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6 text-sm text-yellow-800">
-                <strong>⚠ Entorno Sandbox:</strong> Use estas tarjetas de prueba:
-                <div className="mt-2 space-y-1">
-                  <p><strong>Visa:</strong> <code className="bg-yellow-100 px-1 rounded">4009 1753 3280 6176</code> — CVV: 123 — Vto: 11/30</p>
-                  <p><strong>Mastercard:</strong> <code className="bg-yellow-100 px-1 rounded">5031 7557 3453 0604</code> — CVV: 123 — Vto: 11/30</p>
-                  <p><strong>Amex:</strong> <code className="bg-yellow-100 px-1 rounded">3711 803032 57522</code> — CVV: 1234 — Vto: 11/30</p>
-                  <p className="text-xs text-yellow-600 mt-1">Nombre: APRO (o cualquier nombre) — Monto: S/. 180.00</p>
-                </div>
-              </div>
-
               <div className="flex gap-3">
                 <button onClick={() => setStep(2)} className="btn-secondary">← Atrás</button>
                 <button onClick={iniciarPago} disabled={loading} id="btn-pagar" className="btn-primary flex items-center gap-2 flex-1 justify-center">
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-                  Pagar S/. 180.00 con MercadoPago
+                  {loading ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Generando código QR...</>
+                  ) : (
+                    <><Smartphone className="w-4 h-4" /> Pagar S/. 1.80 con Yape</>
+                  )}
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* QR generado — esperando pago */}
+          {step === 3 && yapeQr && !pagoConfirmado && (
+            <div className="text-center">
+              <h2 className="font-bold text-xl text-gray-800 mb-1">Escane el código QR</h2>
+              <p className="text-gray-500 text-sm mb-6">
+                Abra la aplicación <strong>Yape</strong>, presione <strong>&quot;Pagar con QR&quot;</strong> y escanee este código.
+              </p>
+
+              <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-xl p-6 mb-4 max-w-sm mx-auto">
+                <p className="text-blue-200 text-sm mb-1">Monto fijo</p>
+                <p className="text-4xl font-black">S/. 1.80</p>
+              </div>
+
+              <div className="bg-white border-2 border-gray-200 rounded-xl p-4 inline-block mb-4 shadow-lg">
+                {yapeQr.qrCodeBase64 ? (
+                  <img
+                    src={`data:image/png;base64,${yapeQr.qrCodeBase64}`}
+                    alt="Código QR Yape"
+                    className="w-56 h-56"
+                  />
+                ) : (
+                  <div className="w-56 h-56 bg-gray-100 flex items-center justify-center text-gray-400">
+                    Cargando QR...
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-4">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Esperando confirmación... ({Math.floor(segundosRestantes / 60)}:{(segundosRestantes % 60).toString().padStart(2, '0')})
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800 text-left mb-4">
+                <p className="font-semibold mb-1">📱 Pasos para pagar:</p>
+                <ol className="list-decimal list-inside space-y-1 text-blue-700">
+                  <li>Abra Yape en su celular</li>
+                  <li>Presione &quot;Pagar con QR&quot;</li>
+                  <li>Escanee el código QR de esta pantalla</li>
+                  <li>Verifique que el monto sea <strong>S/. 1.80</strong></li>
+                  <li>Presione &quot;Yapear&quot; y confirme</li>
+                </ol>
+              </div>
+
+              <button
+                onClick={() => { setYapeQr(null); setError(''); }}
+                className="text-sm text-gray-500 hover:text-gray-700 underline"
+              >
+                Cancelar y volver
+              </button>
+            </div>
+          )}
+
+          {/* Pago confirmado exitosamente */}
+          {step === 3 && pagoConfirmado && (
+            <div className="text-center py-8">
+              <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
+              <h2 className="font-bold text-2xl text-gray-800 mb-2">¡Pago Confirmado!</h2>
+              <p className="text-gray-500 mb-2">El pago de <strong>S/. 1.80</strong> ha sido procesado correctamente.</p>
+              <Loader2 className="w-5 h-5 animate-spin mx-auto text-blue-600" />
+              <p className="text-sm text-gray-400 mt-2">Avanzando al siguiente paso...</p>
             </div>
           )}
 

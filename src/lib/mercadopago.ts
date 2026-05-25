@@ -1,5 +1,6 @@
 /**
- * Cliente MercadoPago para sandbox peruano
+ * Cliente MercadoPago para producción peruana
+ * Usa credenciales APP_USR- (no TEST-)
  */
 
 export interface PreferenciaPagoInput {
@@ -11,11 +12,19 @@ export interface PreferenciaPagoInput {
 
 export interface PreferenciaPagoOutput {
   preferenceId: string;
-  initPoint: string;      // URL del checkout MP (sandbox)
-  sandboxInitPoint: string;
+  initPoint: string;
 }
 
-const MONTO_LICENCIA = 180.00;
+export interface YapePaymentData {
+  paymentId: number;
+  qrCodeBase64: string;
+  qrCodeText: string;
+  ticketUrl: string;
+  monto: number;
+  estado: string;
+}
+
+const MONTO_LICENCIA = 1.80; // Monto fijo bloqueado del lado servidor (real: 180.00)
 
 export async function crearPreferenciaPago(
   input: PreferenciaPagoInput
@@ -61,7 +70,52 @@ export async function crearPreferenciaPago(
   return {
     preferenceId: result.id!,
     initPoint: result.init_point!,
-    sandboxInitPoint: result.sandbox_init_point!,
+  };
+}
+
+/**
+ * Crea un pago Yape con QR dinámico.
+ * El monto se fija en el servidor (1.80 PEN) y no puede modificarse desde el cliente.
+ * Retorna la imagen QR en Base64 para mostrar al usuario.
+ */
+export async function crearPagoYapeQR(input: {
+  tramiteId: string;
+  negocioRazonSocial: string;
+  ruc: string;
+  emailContacto?: string;
+}): Promise<YapePaymentData> {
+  const { MercadoPagoConfig, Payment } = await import('mercadopago');
+
+  const client = new MercadoPagoConfig({
+    accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN!,
+  });
+
+  const payment = new Payment(client);
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+  const result = await payment.create({
+    body: {
+      transaction_amount: MONTO_LICENCIA,
+      description: `Licencia Municipal — ${input.negocioRazonSocial} (RUC: ${input.ruc})`,
+      payment_method_id: 'yape',
+      payer: {
+        email: input.emailContacto || 'pago@licencias.munitujillo.pe',
+      },
+      external_reference: input.tramiteId,
+      notification_url: `${appUrl}/api/pagos/webhook`,
+    },
+  });
+
+  const txnData = (result as any).point_of_interaction?.transaction_data;
+
+  return {
+    paymentId: result.id!,
+    qrCodeBase64: txnData?.qr_code_base64 || '',
+    qrCodeText: txnData?.qr_code || '',
+    ticketUrl: txnData?.ticket_url || '',
+    monto: MONTO_LICENCIA,
+    estado: result.status!,
   };
 }
 
