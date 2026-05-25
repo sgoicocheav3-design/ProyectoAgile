@@ -5,7 +5,7 @@ import { crearPreferenciaPago, MONTO_LICENCIA, MercadoPagoError } from '@/lib/me
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { tramiteId } = body;
+    const { tramiteId, backUrlBase } = body;
 
     if (!tramiteId) {
       return NextResponse.json({ error: 'tramiteId es requerido.' }, { status: 400 });
@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
       negocioRazonSocial: tramite.negocio.razonSocial,
       ruc: tramite.negocio.ruc,
       esRenovacion: tramite.esRenovacion,
+      backUrlBase,
     });
 
     const pago = pagoExistente

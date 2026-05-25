@@ -17,6 +17,7 @@ export interface PreferenciaPagoInput {
   negocioRazonSocial: string;
   ruc: string;
   esRenovacion?: boolean;
+  backUrlBase?: string;
 }
 
 export interface PreferenciaPagoOutput {
@@ -107,6 +108,7 @@ export async function crearPreferenciaPago(
   const { Preference } = await import('mercadopago');
   const preference = new Preference(client);
   const appUrl = env.NEXT_PUBLIC_APP_URL;
+  const backUrlBase = input.backUrlBase || `${appUrl}/contribuyente/tramite/${input.tramiteId}`;
 
   let result;
   try {
@@ -129,9 +131,9 @@ export async function crearPreferenciaPago(
         },
         external_reference: input.tramiteId,
         back_urls: {
-          success: `${appUrl}/contribuyente/tramite/${input.tramiteId}?pago=success`,
-          failure: `${appUrl}/contribuyente/tramite/${input.tramiteId}?pago=failure`,
-          pending: `${appUrl}/contribuyente/tramite/${input.tramiteId}?pago=pending`,
+          success: `${backUrlBase}?pago=success`,
+          failure: `${backUrlBase}?pago=failure`,
+          pending: `${backUrlBase}?pago=pending`,
         },
         notification_url: `${appUrl}/api/pagos/webhook`,
         statement_descriptor: 'MPT LICENCIAS',
