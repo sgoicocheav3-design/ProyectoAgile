@@ -24,5 +24,5 @@ export const env = {
   get NEXTAUTH_URL() { return process.env.NEXTAUTH_URL || ''; },
   get OPENAI_API_KEY() { return process.env.OPENAI_API_KEY || ''; },
   get NEXT_PUBLIC_ROBOFLOW_API_KEY() { return process.env.NEXT_PUBLIC_ROBOFLOW_API_KEY || ''; },
-  get NEXT_PUBLIC_ROBOFLOW_MODEL_ID() { return process.env.NEXT_PUBLIC_ROBOFLOW_MODEL_ID || ''; },
+
 };

@@ -75,14 +75,9 @@ export default function SolicitudPage() {
 
       const response = await axios({
         method: 'POST',
-        url: 'https://serverless.roboflow.com/architectural-blueprint/2',
-        params: {
-          api_key: process.env.NEXT_PUBLIC_ROBOFLOW_API_KEY || 'dL3elWTQDy5dakUOlfr',
-        },
-        data: imageBase64,
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
+        url: '/api/validate-plan',
+        data: { image: imageBase64 },
+        headers: { 'Content-Type': 'application/json' },
       });
 
       const detections = response.data?.predictions;
