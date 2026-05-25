@@ -20,6 +20,7 @@ export const env = {
   get APIS_PERU_TOKEN() { return process.env.APIS_PERU_TOKEN || ''; },
   get NEXT_PUBLIC_SUPABASE_URL() { return process.env.NEXT_PUBLIC_SUPABASE_URL || ''; },
   get SUPABASE_SERVICE_ROLE_KEY() { return process.env.SUPABASE_SERVICE_ROLE_KEY || ''; },
-  get NEXT_PUBLIC_APP_URL() { return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'; },
+   get NEXT_PUBLIC_APP_URL() { return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'; },
   get NEXTAUTH_URL() { return process.env.NEXTAUTH_URL || ''; },
+  get OPENAI_API_KEY() { return process.env.OPENAI_API_KEY || ''; },
 };

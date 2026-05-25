@@ -30,6 +30,10 @@ export default function SolicitudPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [planoFile, setPlanoFile] = useState<File | null>(null);
+  const [planoPreview, setPlanoPreview] = useState<string | null>(null);
+  const [isValidandoPlano, setIsValidandoPlano] = useState(false);
+  const [planoValidation, setPlanoValidation] = useState<{ isPlan: boolean; confidence: number; reason: string } | null>(null);
+  const [planoValidationError, setPlanoValidationError] = useState<string | null>(null);
 
   // Paso 4: datos de cuenta
   const [email, setEmail] = useState('');
@@ -50,6 +54,46 @@ export default function SolicitudPage() {
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
   const MIN_FILE_SIZE = 10 * 1024; // 10 KB — evitar archivos vacíos
 
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result.split(',')[1]);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const validarPlanoConIA = async () => {
+    if (!planoFile) return;
+    setIsValidandoPlano(true);
+    setPlanoValidation(null);
+    setPlanoValidationError(null);
+
+    try {
+      const base64 = await fileToBase64(planoFile);
+      const res = await fetch('/api/validar-plano', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, mimeType: planoFile.type }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setPlanoValidationError(data.error || 'Error al validar el plano.');
+        return;
+      }
+
+      setPlanoValidation(data);
+    } catch {
+      setPlanoValidationError('Error de conexión al validar el plano.');
+    } finally {
+      setIsValidandoPlano(false);
+    }
+  };
+
   const validarPlano = (file: File | null): string | null => {
     if (!file) return 'Debe seleccionar un archivo.';
 
@@ -59,12 +103,6 @@ export default function SolicitudPage() {
     const ext = file.name.split('.').pop()?.toLowerCase();
     if (!ext || !VALID_EXTENSIONS.includes(ext)) return 'Extensión de archivo no válida. Use PDF, PNG o JPG.';
     if (!VALID_MIME_TYPES.includes(file.type)) return 'Tipo de archivo no válido. Use PDF, PNG o JPG.';
-
-    // Placeholder para validación con IA
-    // TODO: Conectar con API de IA para verificar que el archivo es un plano arquitectónico real
-    // Ej: enviar file a endpoint /api/validar-plano-ia que devuelva { valido: boolean, confianza: number }
-    // const esPlano = await validarConIA(file);
-    // if (!esPlano) return 'El archivo no parece ser un plano arquitectónico válido.';
 
     return null;
   };
@@ -116,6 +154,11 @@ export default function SolicitudPage() {
     const validacion = validarPlano(planoFile);
     if (validacion) {
       setError(validacion);
+      return;
+    }
+
+    if (!planoValidation?.isPlan) {
+      setError('Debe validar el plano con IA antes de continuar.');
       return;
     }
 
@@ -185,6 +228,13 @@ export default function SolicitudPage() {
       processingRef.current = false;
     }
   };
+
+  // Limpiar preview al desmontar
+  useEffect(() => {
+    return () => {
+      if (planoPreview) URL.revokeObjectURL(planoPreview);
+    };
+  }, [planoPreview]);
 
   // Detectar retorno desde MercadoPago
   useEffect(() => {
@@ -369,13 +419,100 @@ export default function SolicitudPage() {
                   type="file"
                   accept=".pdf,.png,.jpg,.jpeg"
                   className="hidden"
-                  onChange={(e) => setPlanoFile(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setPlanoFile(file);
+                    setPlanoValidation(null);
+                    setPlanoValidationError(null);
+                    if (planoPreview) URL.revokeObjectURL(planoPreview);
+                    setPlanoPreview(file ? URL.createObjectURL(file) : null);
+                  }}
                 />
               </div>
 
+              {/* Preview de imagen */}
+              {planoPreview && planoFile?.type.startsWith('image/') && (
+                <div className="mt-4 rounded-xl overflow-hidden border border-gray-200">
+                  <img
+                    src={planoPreview}
+                    alt="Vista previa del plano"
+                    className="w-full h-64 object-contain bg-gray-100"
+                  />
+                </div>
+              )}
+
+              {/* Validación con IA */}
+              {planoFile && !planoValidation && !isValidandoPlano && (
+                <button
+                  onClick={validarPlanoConIA}
+                  disabled={isValidandoPlano}
+                  className="btn-primary w-full mt-4 flex items-center justify-center gap-2"
+                  id="btn-validar-plano"
+                >
+                  <Search className="w-4 h-4" />
+                  Validar Plano con IA
+                </button>
+              )}
+
+              {isValidandoPlano && (
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                  <div>
+                    <p className="font-medium text-blue-800">Analizando imagen con IA...</p>
+                    <p className="text-sm text-blue-600">Verificando que sea un plano arquitectónico válido</p>
+                  </div>
+                </div>
+              )}
+
+              {planoValidation && planoValidation.isPlan && (
+                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg animate-fade-in">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    <span className="font-semibold text-green-800">Plano válido</span>
+                  </div>
+                  <p className="text-sm text-green-700 mt-1">
+                    Confianza: {planoValidation.confidence}% — {planoValidation.reason}
+                  </p>
+                </div>
+              )}
+
+              {planoValidation && !planoValidation.isPlan && (
+                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg animate-fade-in">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-500" />
+                    <span className="font-semibold text-red-800">No parece un plano válido</span>
+                  </div>
+                  <p className="text-sm text-red-700 mt-1">
+                    {planoValidation.reason} (Confianza: {planoValidation.confidence}%)
+                  </p>
+                  <p className="text-xs text-red-600 mt-2">Seleccione otro archivo e intente nuevamente.</p>
+                </div>
+              )}
+
+              {planoValidationError && (
+                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg animate-fade-in">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-500" />
+                    <span className="font-semibold text-red-800">Error de validación</span>
+                  </div>
+                  <p className="text-sm text-red-700 mt-1">{planoValidationError}</p>
+                  <button
+                    onClick={validarPlanoConIA}
+                    className="mt-3 text-sm text-blue-600 hover:underline"
+                  >
+                    Intentar nuevamente
+                  </button>
+                </div>
+              )}
+
               <div className="flex gap-3 mt-6">
                 <button onClick={() => setStep(1)} className="btn-secondary">← Atrás</button>
-                <button onClick={subirPlano} disabled={loading || !planoFile} id="btn-subir-plano" className="btn-primary flex items-center gap-2">
+                <button
+                  onClick={subirPlano}
+                  disabled={loading || !planoFile || !planoValidation?.isPlan}
+                  id="btn-subir-plano"
+                  className="btn-primary flex items-center gap-2"
+                >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                   Subir y Continuar
                 </button>
