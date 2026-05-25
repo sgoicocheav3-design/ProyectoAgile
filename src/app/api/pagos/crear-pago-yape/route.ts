@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { crearPagoYapeQR, MONTO_LICENCIA } from '@/lib/mercadopago';
+import { crearPagoYapeQR, MONTO_LICENCIA, MercadoPagoError } from '@/lib/mercadopago';
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,8 +64,31 @@ export async function POST(request: NextRequest) {
       monto: MONTO_LICENCIA,
       moneda: 'PEN',
     });
+
   } catch (error) {
-    console.error('[YAPE_QR] Error:', error);
-    return NextResponse.json({ error: 'Error al generar el pago Yape.' }, { status: 500 });
+    if (error instanceof MercadoPagoError) {
+      const statusMap: Record<string, number> = {
+        auth: 502,
+        api: 502,
+        network: 504,
+      };
+      const httpStatus = statusMap[error.kind] || 502;
+
+      console.error(`[YAPE_QR] Error MercadoPago (${error.kind}):`, error.message, error.cause || '');
+      return NextResponse.json(
+        {
+          error: error.message,
+          codigo: `MP_${error.kind.toUpperCase()}`,
+          detalle: 'El servicio de pagos externo no está disponible.',
+        },
+        { status: httpStatus }
+      );
+    }
+
+    console.error('[YAPE_QR] Error interno:', error);
+    return NextResponse.json(
+      { error: 'Error interno al generar el pago.' },
+      { status: 500 }
+    );
   }
 }
