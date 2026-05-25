@@ -1,4 +1,4 @@
-import { env } from '@/lib/env';
+import { env, requireEnv } from '@/lib/env';
 
 export class MercadoPagoError extends Error {
   constructor(
@@ -37,13 +37,7 @@ export interface YapePaymentData {
 export const MONTO_LICENCIA = 1.80;
 
 function validateCredentials(): void {
-  const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
-  if (!token) {
-    throw new MercadoPagoError(
-      'Token de MercadoPago no configurado. Verifica MERCADOPAGO_ACCESS_TOKEN en las variables de entorno.',
-      'auth'
-    );
-  }
+  const token = requireEnv('MERCADOPAGO_ACCESS_TOKEN');
   if (!token.startsWith('APP_USR-')) {
     throw new MercadoPagoError(
       'El token de MercadoPago no es de producción. Debe comenzar con APP_USR-. Verifica MERCADOPAGO_ACCESS_TOKEN.',
