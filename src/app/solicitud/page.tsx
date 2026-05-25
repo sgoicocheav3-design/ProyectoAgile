@@ -81,19 +81,23 @@ export default function SolicitudPage() {
       });
 
       const detections = response.data?.predictions;
+      const MIN_CONFIDENCE = 0.70;
+      const validPredictions = detections
+        ? detections.filter((pred: { confidence: number }) => pred.confidence >= MIN_CONFIDENCE)
+        : [];
 
-      if (detections && detections.length > 0) {
-        const top = detections[0];
+      if (validPredictions.length > 0) {
+        const top = validPredictions[0];
         setPlanoValidation({
           isPlan: true,
           confidence: Math.round(top.confidence * 100),
-          reason: `Se detectaron ${detections.length} elementos arquitectónicos (${top.class} con ${(top.confidence * 100).toFixed(0)}% de confianza).`,
+          reason: `Se detectaron ${validPredictions.length} elementos arquitectónicos (${top.class} con ${(top.confidence * 100).toFixed(0)}% de confianza).`,
         });
       } else {
         setPlanoValidation({
           isPlan: false,
           confidence: 0,
-          reason: 'El modelo no detectó elementos de un plano arquitectónico.',
+          reason: 'El documento no parece ser un plano válido.',
         });
       }
     } catch (err: unknown) {
