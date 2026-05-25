@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { crearPagoYapeQR, MONTO_LICENCIA, MercadoPagoError } from '@/lib/mercadopago';
+import { EnvError } from '@/lib/env';
 
 export async function POST(request: NextRequest) {
   try {
@@ -82,6 +83,14 @@ export async function POST(request: NextRequest) {
           detalle: 'El servicio de pagos externo no está disponible.',
         },
         { status: httpStatus }
+      );
+    }
+
+    if (error instanceof EnvError) {
+      console.error('[YAPE_QR] Error de configuración:', error.message);
+      return NextResponse.json(
+        { error: error.message },
+        { status: 500 }
       );
     }
 

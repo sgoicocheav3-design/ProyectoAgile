@@ -1,9 +1,16 @@
+export class EnvError extends Error {
+  constructor(name: string) {
+    super(
+      `[ENV] Falta la variable de entorno "${name}".\n\n` +
+      `  En desarrollo: agrégala a tu archivo .env.local\n` +
+      `  En producción (Vercel): Vercel Dashboard → Project → Settings → Environment Variables\n`
+    );
+    this.name = 'EnvError';
+  }
+}
+
 export function envError(name: string): Error {
-  return new Error(
-    `[ENV] Falta la variable de entorno "${name}".\n\n` +
-    `  En desarrollo: agrégala a tu archivo .env.local\n` +
-    `  En producción (Vercel): Vercel Dashboard → Project → Settings → Environment Variables\n`
-  );
+  return new EnvError(name);
 }
 
 export function requireEnv(name: string): string {
@@ -20,7 +27,7 @@ export const env = {
   get APIS_PERU_TOKEN() { return process.env.APIS_PERU_TOKEN || ''; },
   get NEXT_PUBLIC_SUPABASE_URL() { return process.env.NEXT_PUBLIC_SUPABASE_URL || ''; },
   get SUPABASE_SERVICE_ROLE_KEY() { return process.env.SUPABASE_SERVICE_ROLE_KEY || ''; },
-   get NEXT_PUBLIC_APP_URL() { return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'; },
+  get NEXT_PUBLIC_APP_URL() { return process.env.NEXT_PUBLIC_APP_URL; },
   get NEXTAUTH_URL() { return process.env.NEXTAUTH_URL || ''; },
   get OPENAI_API_KEY() { return process.env.OPENAI_API_KEY || ''; },
   get NEXT_PUBLIC_ROBOFLOW_API_KEY() { return process.env.NEXT_PUBLIC_ROBOFLOW_API_KEY || ''; },

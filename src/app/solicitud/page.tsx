@@ -255,7 +255,7 @@ export default function SolicitudPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const status = params.get('pago');
-    const tid = params.get('tramiteId');
+    const tid = params.get('tramiteId') || params.get('external_reference');
 
     if (status === 'success' && tid) {
       setTramiteId(tid);

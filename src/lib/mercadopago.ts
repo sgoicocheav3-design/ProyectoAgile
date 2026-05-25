@@ -1,4 +1,4 @@
-import { env, requireEnv } from '@/lib/env';
+import { env, requireEnv, EnvError } from '@/lib/env';
 
 export class MercadoPagoError extends Error {
   constructor(
@@ -56,6 +56,7 @@ async function createClient() {
 
 async function handleSDKError(error: unknown): Promise<never> {
   if (error instanceof MercadoPagoError) throw error;
+  if (error instanceof EnvError) throw error;
 
   const err = error as Record<string, unknown>;
   const status = typeof err.status === 'number' ? err.status : undefined;
@@ -101,7 +102,7 @@ export async function crearPreferenciaPago(
   const client = await createClient();
   const { Preference } = await import('mercadopago');
   const preference = new Preference(client);
-  const appUrl = env.NEXT_PUBLIC_APP_URL;
+  const appUrl = requireEnv('NEXT_PUBLIC_APP_URL');
   const backUrlBase = input.backUrlBase || `${appUrl}/contribuyente/tramite/${input.tramiteId}`;
 
   let result;
@@ -152,7 +153,7 @@ export async function crearPagoYapeQR(input: {
   const client = await createClient();
   const { Payment } = await import('mercadopago');
   const payment = new Payment(client);
-  const appUrl = env.NEXT_PUBLIC_APP_URL;
+  const appUrl = requireEnv('NEXT_PUBLIC_APP_URL');
 
   let result;
   try {
