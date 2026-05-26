@@ -41,7 +41,6 @@ export default function AccesoInspectorPage() {
   const [loading, setLoading] = useState(false);
   const [currentInspector, setCurrentInspector] = useState<InspectorData | null>(null);
   const [inspecciones, setInspecciones] = useState<InspeccionData[]>([]);
-  const [esDemo, setEsDemo] = useState(false);
 
   const handleIngresar = async () => {
     const trimmed = codigo.trim().toUpperCase();
@@ -69,7 +68,6 @@ export default function AccesoInspectorPage() {
 
       setCurrentInspector(data.inspector);
       setInspecciones(data.inspecciones);
-      setEsDemo(data.modo === 'demo');
       setCodigo('');
     } catch {
       setError('Error de conexión. Intente nuevamente.');
@@ -81,7 +79,6 @@ export default function AccesoInspectorPage() {
   const handleCerrarSesion = () => {
     setCurrentInspector(null);
     setInspecciones([]);
-    setEsDemo(false);
   };
 
   if (currentInspector) {
@@ -128,11 +125,6 @@ export default function AccesoInspectorPage() {
               <span className="text-blue-300 ml-3 text-xs bg-blue-700/40 px-2 py-0.5 rounded uppercase">
                 {currentInspector.rol}
               </span>
-              {esDemo && (
-                <span className="ml-2 text-xs bg-yellow-400 text-blue-900 font-bold px-2 py-0.5 rounded">
-                  MODO DEMO
-                </span>
-              )}
             </p>
           </div>
 
@@ -262,7 +254,7 @@ export default function AccesoInspectorPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej: INS-001 o 00000002"
+                  placeholder="Ej: 00000002 o inspector@demo.pe"
                   value={codigo}
                   onChange={(e) => {
                     setCodigo(e.target.value);
@@ -284,10 +276,10 @@ export default function AccesoInspectorPage() {
               </div>
 
               <p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3 border border-gray-100">
-                <span className="font-semibold">Demo:</span> Usa{' '}
-                <span className="font-mono text-blue-600">INS-001</span> (Carlos Mendoza),{' '}
-                <span className="font-mono text-blue-600">INS-002</span> (Rosa Huamán) o{' '}
-                <span className="font-mono text-blue-600">INS-003</span> (Miguel Ruiz)
+                <span className="font-semibold">Credenciales reales:</span> Usa{' '}
+                <span className="font-mono text-blue-600">00000002</span> (Inspector Juan Rojas) o{' '}
+                <span className="font-mono text-blue-600">00000003</span> (Inspector María Vásquez).
+                También puedes usar tu correo electrónico.
               </p>
 
               <button
