@@ -41,6 +41,7 @@ export default function ModalAccesoInspector() {
   const [loading, setLoading] = useState(false);
   const [currentInspector, setCurrentInspector] = useState<InspectorData | null>(null);
   const [inspecciones, setInspecciones] = useState<InspeccionData[]>([]);
+  const [esDemo, setEsDemo] = useState(false);
 
   const handleIngresar = async () => {
     const trimmed = codigo.trim().toUpperCase();
@@ -53,7 +54,7 @@ export default function ModalAccesoInspector() {
     setError('');
 
     try {
-      const res = await fetch('/api/inspectores/acceso', {
+      const res = await fetch('/api/inspector/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ codigo: trimmed }),
@@ -68,6 +69,7 @@ export default function ModalAccesoInspector() {
 
       setCurrentInspector(data.inspector);
       setInspecciones(data.inspecciones);
+      setEsDemo(data.modo === 'demo');
       setIsModalOpen(false);
       setCodigo('');
     } catch {
@@ -80,6 +82,7 @@ export default function ModalAccesoInspector() {
   const handleCerrarSesion = () => {
     setCurrentInspector(null);
     setInspecciones([]);
+    setEsDemo(false);
   };
 
   const handleCancelar = () => {
@@ -132,6 +135,11 @@ export default function ModalAccesoInspector() {
               <span className="text-blue-300 ml-3 text-xs bg-blue-700/40 px-2 py-0.5 rounded uppercase">
                 {currentInspector.rol}
               </span>
+              {esDemo && (
+                <span className="ml-2 text-xs bg-yellow-400 text-blue-900 font-bold px-2 py-0.5 rounded">
+                  MODO DEMO
+                </span>
+              )}
             </p>
           </div>
 
@@ -242,11 +250,11 @@ export default function ModalAccesoInspector() {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Ingrese su Código de Credencial (DNI)
+                  Ingrese su Código de Credencial
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej: 00000002"
+                  placeholder="Ej: INS-001 o 00000002"
                   value={codigo}
                   onChange={(e) => {
                     setCodigo(e.target.value);
@@ -269,8 +277,9 @@ export default function ModalAccesoInspector() {
 
               <p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3 border border-gray-100">
                 <span className="font-semibold">Demo:</span> Usa{' '}
-                <span className="font-mono text-blue-600">00000002</span> (Inspector Juan) o{' '}
-                <span className="font-mono text-blue-600">00000003</span> (Inspector María)
+                <span className="font-mono text-blue-600">INS-001</span> (Carlos Mendoza),{' '}
+                <span className="font-mono text-blue-600">INS-002</span> (Rosa Huamán) o{' '}
+                <span className="font-mono text-blue-600">INS-003</span> (Miguel Ruiz)
               </p>
             </div>
 
