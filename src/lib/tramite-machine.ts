@@ -70,7 +70,8 @@ import { generarComprobante } from './facturacion';
  */
 export async function onPagoConfirmado(
   tramiteId: string,
-  pagoId: string
+  pagoId: string,
+  baseUrl?: string
 ): Promise<TransicionResult> {
   const tramite = await prisma.tramite.findUnique({
     where: { id: tramiteId },
@@ -110,21 +111,25 @@ export async function onPagoConfirmado(
       nombreSolicitante: tramite.nombreSolicitante || undefined,
       emailSolicitante: tramite.emailSolicitante || undefined,
       dniSolicitante: tramite.dniSolicitante || undefined,
-    }, pago.id);
+    }, pago.id, baseUrl);
   } catch (error) {
     console.error('[FACTURACION] Error al generar comprobante:', error);
   }
 
-  // Enviar comprobante por email (no blocking)
-  if (comprobante) {
-    const { enviarComprobanteEmail } = await import('./email-service');
-    enviarComprobanteEmail({
-      email: tramite.emailSolicitante || '',
-      nombre: tramite.nombreSolicitante || tramite.negocio.razonSocial,
-      tipoComprobante,
-      serieCorrelativo: comprobante.serie_correlativo,
-      pdfUrl: comprobante.url_pdf,
-    });
+  // Enviar comprobante por email
+  if (comprobante && tramite.emailSolicitante) {
+    try {
+      const { enviarComprobanteEmail } = await import('./email-service');
+      await enviarComprobanteEmail({
+        email: tramite.emailSolicitante,
+        nombre: tramite.nombreSolicitante || tramite.negocio.razonSocial,
+        tipoComprobante,
+        serieCorrelativo: comprobante.serie_correlativo,
+        pdfUrl: comprobante.url_pdf,
+      });
+    } catch (emailError) {
+      console.error('[EMAIL] Error al enviar comprobante:', emailError);
+    }
   }
 
   // Actualizar pago como aprobado y guardar comprobante

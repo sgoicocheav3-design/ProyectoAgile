@@ -33,7 +33,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (estadoMP === 'approved') {
-      const resultado = await onPagoConfirmado(tramiteId, pago.id);
+      const appUrl = request.headers.get('origin') || undefined;
+      const resultado = await onPagoConfirmado(tramiteId, pago.id, appUrl);
 
       if (!resultado.exito) {
         await prisma.pago.update({

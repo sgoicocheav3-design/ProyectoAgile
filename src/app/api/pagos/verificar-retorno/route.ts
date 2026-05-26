@@ -17,6 +17,7 @@ import { onPagoConfirmado, asignarInspector } from '@/lib/tramite-machine';
  */
 export async function POST(request: NextRequest) {
   try {
+    const appUrl = request.headers.get('origin') || undefined;
     const body = await request.json();
     const { tramiteId, paymentId, preferenceId } = body as {
       tramiteId?: string;
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
       const pagoMP = await verificarPago(mpPaymentId);
       console.log('[VERIFICAR-RETORNO] Estado MP por payment_id:', pagoMP.status, '| tramite:', tramiteId);
 
-      return await procesarEstadoMP(pagoMP.status, tramiteId, pago.id, mpPaymentId, pagoMP);
+      return await procesarEstadoMP(pagoMP.status, tramiteId, pago.id, mpPaymentId, pagoMP, appUrl);
     }
 
     // --- Estrategia 2: Buscar pagos por preference_id via API de MP ---
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
       const resultado = await buscarPagoPorPreferencia(mpPreferenceId);
       if (resultado) {
         console.log('[VERIFICAR-RETORNO] Estado MP por preference_id:', resultado.status, '| tramite:', tramiteId);
-        return await procesarEstadoMP(resultado.status as string, tramiteId, pago.id, resultado.id?.toString() ?? null, resultado);
+        return await procesarEstadoMP(resultado.status as string, tramiteId, pago.id, resultado.id?.toString() ?? null, resultado, appUrl);
       }
     }
 
@@ -90,11 +91,12 @@ async function procesarEstadoMP(
   tramiteId: string,
   pagoId: string,
   paymentId: string | null,
-  rawData: Record<string, unknown>
+  rawData: Record<string, unknown>,
+  appUrl?: string
 ) {
   if (status === 'approved') {
     // Actualizar en BD y avanzar el trámite
-    const resultado = await onPagoConfirmado(tramiteId, pagoId);
+    const resultado = await onPagoConfirmado(tramiteId, pagoId, appUrl);
 
     if (!resultado.exito) {
       // El trámite puede ya estar en un estado avanzado (race condition con webhook)

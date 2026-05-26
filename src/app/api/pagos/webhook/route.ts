@@ -87,7 +87,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (pagoMP.status === 'approved') {
-      const resultado = await onPagoConfirmado(tramiteId, pago.id);
+      const appUrl = request.headers.get('origin') || undefined;
+      const resultado = await onPagoConfirmado(tramiteId, pago.id, appUrl);
 
       if (!resultado.exito) {
         console.error('[WEBHOOK MP] Error al procesar pago aprobado:', resultado.error);

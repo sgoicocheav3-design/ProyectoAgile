@@ -23,7 +23,8 @@ export interface ComprobanteResultado {
  */
 export async function generarComprobante(
   datos: ComprobanteDatos,
-  pagoId?: string
+  pagoId?: string,
+  appUrl?: string
 ): Promise<ComprobanteResultado> {
   const isFactura = datos.tipoComprobante === 'FACTURA';
   const tipo_de_comprobante = isFactura ? 1 : 2; // SUNAT: 1=Factura, 2=Boleta
@@ -81,10 +82,10 @@ export async function generarComprobante(
   // Simular llamada de red a la API del proveedor de facturación
   await new Promise(resolve => setTimeout(resolve, 800));
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const baseUrl = appUrl || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   const pdfUrl = pagoId
-    ? `${appUrl}/api/comprobante/${pagoId}/pdf`
-    : `${appUrl}/api/comprobante/unknown/pdf`;
+    ? `${baseUrl}/api/comprobante/${pagoId}/pdf`
+    : `${baseUrl}/api/comprobante/unknown/pdf`;
 
   // Devolver el resultado con URL real hacia nuestra API de generación de PDF
   return {
