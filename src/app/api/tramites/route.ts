@@ -58,24 +58,41 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Verificar que no haya un trámite activo para este negocio
-  const tramiteActivo = await prisma.tramite.findFirst({
+  // Buscar trámites en curso que SÍ bloquean el RUC (ya pagados, en inspección, o aprobados)
+  const tramiteBloqueante = await prisma.tramite.findFirst({
     where: {
       negocioId,
       estado: {
-        notIn: ['APROBADO', 'NEGADO'],
+        in: ['PAGADO', 'EN_INSPECCION', 'OBSERVADO', 'SEGUNDA_INSPECCION', 'APROBADO'],
       },
     },
   });
 
-  if (tramiteActivo) {
+  if (tramiteBloqueante) {
     return NextResponse.json(
       {
-        error: `Ya tiene un trámite activo para este negocio (Estado: ${tramiteActivo.estado}).`,
-        tramiteId: tramiteActivo.id,
+        error: `El RUC ya tiene un trámite en proceso o aprobado (Estado: ${tramiteBloqueante.estado}).`,
+        tramiteId: tramiteBloqueante.id,
       },
       { status: 409 }
     );
+  }
+
+  // Encontrar trámites abandonados (INICIADO, DOCUMENTOS_PENDIENTES) para limpiar el RUC
+  const abandonados = await prisma.tramite.findMany({
+    where: {
+      negocioId,
+      estado: { in: ['INICIADO', 'DOCUMENTOS_PENDIENTES'] },
+    },
+    select: { id: true }
+  });
+  
+  if (abandonados.length > 0) {
+    const ids = abandonados.map(t => t.id);
+    // Eliminar dependencias primero
+    await prisma.pago.deleteMany({ where: { tramiteId: { in: ids } } });
+    await prisma.documento.deleteMany({ where: { tramiteId: { in: ids } } });
+    await prisma.tramite.deleteMany({ where: { id: { in: ids } } });
   }
 
   // Crear el trámite

@@ -521,7 +521,7 @@ export default function SolicitudPage() {
               )}
 
               <div className="flex gap-3 mt-6">
-                <button onClick={() => setStep(1)} className="btn-secondary">← Atrás</button>
+                {/* Botón Atrás eliminado para forzar flujo unidireccional */}
                 <button
                   onClick={subirPlano}
                   disabled={loading || !planoFile || !planoValidation?.isPlan}
@@ -565,7 +565,7 @@ export default function SolicitudPage() {
               </div>
 
               <div className="flex gap-3">
-                <button onClick={() => setStep(2)} className="btn-secondary">← Atrás</button>
+                {/* Botón Atrás eliminado para forzar flujo unidireccional */}
                 <button onClick={iniciarPago} disabled={loading} id="btn-pagar" className="btn-primary flex items-center gap-2 flex-1 justify-center">
                   {loading ? (
                     <><Loader2 className="w-4 h-4 animate-spin" /> Redirigiendo a MercadoPago...</>

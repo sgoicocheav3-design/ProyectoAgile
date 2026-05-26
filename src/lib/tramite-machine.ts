@@ -105,8 +105,8 @@ export async function onPagoConfirmado(
     return { exito: false, error: 'Pago no encontrado.' };
   }
 
-  // Calcular próxima fecha disponible (mínimo 2 días hábiles desde hoy)
-  const fechaInspeccion = await obtenerProximaFechaInspeccion();
+  // Calcular próxima fecha disponible respetando el límite de 3 inspecciones diarias
+  const fechaInspeccion = await obtenerProximaFechaInspeccion(inspector.id);
 
   // 1. Ejecutar en transacción atómica la aprobación del trámite y la agenda de inspección
   await prisma.$transaction(async (tx) => {

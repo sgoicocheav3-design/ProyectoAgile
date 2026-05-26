@@ -120,12 +120,43 @@ export function calcularFechaLimiteSincrona(
 }
 
 /**
- * Obtiene la próxima fecha de inspección disponible
- * Mínimo 2 días hábiles desde hoy para dar tiempo al inspector
+ * Obtiene la próxima fecha de inspección disponible para un inspector específico
+ * Mínimo 2 días hábiles desde hoy, garantizando un límite de carga diaria (ej. máx 3)
  */
-export async function obtenerProximaFechaInspeccion(): Promise<Date> {
-  const hoy = new Date();
-  return calcularFechaLimiteDiasHabiles(hoy, 2);
+export async function obtenerProximaFechaInspeccion(inspectorId: string): Promise<Date> {
+  let diasHabilesAsignar = 2; // Empezar buscando a los 2 días hábiles
+  const maxDiasBusqueda = 30; // Evitar loop infinito
+
+  while (diasHabilesAsignar <= maxDiasBusqueda) {
+    const fechaPropuesta = await calcularFechaLimiteDiasHabiles(new Date(), diasHabilesAsignar);
+    
+    // Verificar carga del inspector ese día en Supabase
+    const inicioDia = new Date(fechaPropuesta);
+    inicioDia.setHours(0, 0, 0, 0);
+    const finDia = new Date(fechaPropuesta);
+    finDia.setHours(23, 59, 59, 999);
+
+    const carga = await prisma.inspeccion.count({
+      where: {
+        inspectorId,
+        fechaProgramada: {
+          gte: inicioDia,
+          lte: finDia,
+        },
+      },
+    });
+
+    if (carga < 3) {
+      // Hora por defecto: 9:00 AM local
+      fechaPropuesta.setHours(9, 0, 0, 0);
+      return fechaPropuesta;
+    }
+
+    // Si está lleno (3 o más), buscamos en el siguiente día hábil
+    diasHabilesAsignar++;
+  }
+
+  throw new Error('No hay fechas disponibles para este inspector en los próximos 30 días hábiles.');
 }
 
 /**

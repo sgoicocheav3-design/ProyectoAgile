@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import FormResultadoInspeccion from '@/components/inspector/form-resultado';
+import FormReprogramarInspeccion from '@/components/inspector/form-reprogramar';
 import ComentariosSection from '@/components/inspector/comentarios-section';
 import {
   ArrowLeft,
@@ -235,8 +236,17 @@ export default async function DetalleInspeccionPage({
 
         {/* Formulario de resultado (solo si no está completada) */}
         {!inspeccion.completada && (
-          <div className="card border-2 border-blue-100">
-            <FormResultadoInspeccion inspeccionId={inspeccion.id} />
+          <div className="space-y-4">
+            <div className="card border-2 border-blue-100">
+              <FormResultadoInspeccion inspeccionId={inspeccion.id} />
+            </div>
+            
+            <div className="card border-2 border-orange-100">
+              <FormReprogramarInspeccion 
+                inspeccionId={inspeccion.id} 
+                fechaProgramadaActual={inspeccion.fechaProgramada} 
+              />
+            </div>
           </div>
         )}
 
