@@ -13,6 +13,8 @@ import {
   AlertCircle,
   Loader2,
   ArrowLeft,
+  Eye,
+  LogIn,
 } from 'lucide-react';
 
 type InspeccionData = {
@@ -163,9 +165,10 @@ export default function AccesoInspectorPage() {
             ) : (
               <div className="space-y-4">
                 {inspecciones.map((ins) => (
-                  <div
+                  <Link
                     key={ins.id}
-                    className="card hover:shadow-md transition-shadow border-l-4 border-l-yellow-400"
+                    href={`/inspector/inspeccion/${ins.id}`}
+                    className="card hover:shadow-md transition-shadow border-l-4 border-l-yellow-400 block group"
                   >
                     <div className="flex items-start justify-between">
                       <div className="space-y-2 flex-1">
@@ -202,9 +205,13 @@ export default function AccesoInspectorPage() {
                             {ins.resultado === 'CONFORME' ? 'Conforme' : ins.resultado}
                           </span>
                         )}
+                        <span className="flex items-center gap-1 text-blue-600 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Eye className="w-3.5 h-3.5" />
+                          Ver detalle y registrar
+                        </span>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}

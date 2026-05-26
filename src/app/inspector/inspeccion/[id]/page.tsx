@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import FormResultadoInspeccion from '@/components/inspector/form-resultado';
 import ComentariosSection from '@/components/inspector/comentarios-section';
+import ReprogramarInspeccion from '@/components/inspector/reprogramar-inspeccion';
 import {
   ArrowLeft,
   Building2,
@@ -230,6 +231,16 @@ export default async function DetalleInspeccionPage({
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Reprogramar visita (solo si no está completada) */}
+        {!inspeccion.completada && (
+          <div className="card border-2 border-orange-100">
+            <ReprogramarInspeccion
+              inspeccionId={inspeccion.id}
+              fechaActual={inspeccion.fechaProgramada.toISOString()}
+            />
           </div>
         )}
 

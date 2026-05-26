@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import {
-  Shield, Search, FileText, CreditCard, ClipboardCheck
+  Shield, Search, FileText, CreditCard, ClipboardCheck, LogIn
 } from 'lucide-react';
 import ModalAccesoInspector from '@/components/inspector/modal-acceso-inspector';
 
@@ -22,7 +22,16 @@ export default function HomePage() {
               </h1>
             </div>
           </div>
-          <ModalAccesoInspector />
+          <div className="flex items-center gap-2">
+            <Link
+              href="/login"
+              className="px-4 py-2 text-white bg-blue-700/50 border border-blue-400/30 rounded-lg hover:bg-blue-700/70 transition text-sm font-medium flex items-center gap-2"
+            >
+              <LogIn className="w-4 h-4" />
+              Iniciar Sesión
+            </Link>
+            <ModalAccesoInspector />
+          </div>
         </div>
       </header>
 
