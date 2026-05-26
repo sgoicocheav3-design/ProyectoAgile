@@ -98,6 +98,10 @@ model Tramite {
   esRenovacion          Boolean       @default(false) @map("es_renovacion")
   tramiteOrigenId       String?       @map("tramite_origen_id") // Para renovaciones
   motivoNegado          String?       @map("motivo_negado")
+  // Datos de solicitud de boleta/factura
+  emailSolicitante      String?       @map("email_solicitante")
+  nombreSolicitante     String?       @map("nombre_solicitante")
+  tipoComprobante       String?       @map("tipo_comprobante") // BOLETA o FACTURA
   fechaInicio           DateTime      @default(now()) @map("fecha_inicio")
   fechaAprobacion       DateTime?     @map("fecha_aprobacion")
   createdAt             DateTime      @default(now()) @map("created_at")

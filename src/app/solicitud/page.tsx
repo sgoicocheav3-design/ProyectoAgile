@@ -36,11 +36,11 @@ export default function SolicitudPage() {
   const [planoValidation, setPlanoValidation] = useState<{ isPlan: boolean; confidence: number; reason: string } | null>(null);
   const [planoValidationError, setPlanoValidationError] = useState<string | null>(null);
 
-  // Paso 4: datos de cuenta
+  // Paso 4: solicitar boleta
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [nombre, setNombre] = useState('');
-  const [cuentaCreada, setCuentaCreada] = useState(false);
+  const [tipoComprobante, setTipoComprobante] = useState<'BOLETA' | 'FACTURA'>('BOLETA');
+  const [boletaSolicitada, setBoletaSolicitada] = useState(false);
 
   // Track si el negocio ya tiene usuario
   const [negocioYaTieneCuenta, setNegocioYaTieneCuenta] = useState(false);
@@ -281,15 +281,11 @@ export default function SolicitudPage() {
   }, []);
 
   // ─────────────────────────────────────────
-  // PASO 4: Crear cuenta post-pago
+  // PASO 4: Solicitar boleta/factura
   // ─────────────────────────────────────────
-  const crearCuenta = async () => {
-    if (!email || !password || !nombre) {
+  const solicitarBoleta = async () => {
+    if (!email || !nombre) {
       setError('Complete todos los campos.');
-      return;
-    }
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres.');
       return;
     }
     setLoading(true);
@@ -298,18 +294,18 @@ export default function SolicitudPage() {
     const res = await fetch('/api/auth/crear-cuenta-post-pago', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, nombre, tramiteId }),
+      body: JSON.stringify({ email, nombre, tramiteId, tipoComprobante }),
     });
 
     const data = await res.json();
 
     if (!res.ok) {
-      setError(data.error || 'Error al crear la cuenta.');
+      setError(data.error || 'Error al procesar la solicitud.');
       setLoading(false);
       return;
     }
 
-    setCuentaCreada(true);
+    setBoletaSolicitada(true);
     setLoading(false);
   };
 
@@ -317,7 +313,7 @@ export default function SolicitudPage() {
     { n: 1, label: 'Validar RUC' },
     { n: 2, label: 'Documentos' },
     { n: 3, label: 'Pago' },
-    { n: 4, label: 'Crear Cuenta' },
+    { n: 4, label: 'Solicitar Boleta' },
   ];
 
   return (
@@ -602,13 +598,13 @@ export default function SolicitudPage() {
             </div>
           )}
 
-          {/* STEP 4: Crear cuenta */}
-          {step === 4 && !cuentaCreada && (
+          {/* STEP 4: Solicitar Boleta */}
+          {step === 4 && !boletaSolicitada && (
             <div>
-              <h2 className="font-bold text-xl text-gray-800 mb-1">Paso 4: Crear su Cuenta</h2>
+              <h2 className="font-bold text-xl text-gray-800 mb-1">Paso 4: Solicitar Boleta</h2>
               <p className="text-gray-500 text-sm mb-6">
-                Ingrese un correo electrónico y una contraseña para poder recibir notificaciones sobre el estado de su trámite
-                y acceder a su licencia cuando esté aprobada.
+                Ingrese sus datos para que podamos preparar y enviar la boleta o factura de su trámite. 
+                Esta información también se usará para las notificaciones sobre el estado de su solicitud.
               </p>
 
               <div className="space-y-4">
@@ -637,51 +633,71 @@ export default function SolicitudPage() {
                     id="input-email"
                   />
                   <p className="text-xs text-gray-400 mt-1">
-                    A este correo llegarán las notificaciones de su trámite.
+                    A este correo se enviarán la boleta/factura y notificaciones de su trámite.
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Mínimo 6 caracteres"
-                    className="input-base"
-                    id="input-password"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">
-                    Si pierde su contraseña, podrá recuperarla por este correo.
-                    Si pierde acceso al correo, contacte a soporte de la municipalidad.
-                  </p>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de comprobante</label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-blue-50 transition" htmlFor="opcion-boleta">
+                      <input
+                        id="opcion-boleta"
+                        type="radio"
+                        name="comprobante"
+                        value="BOLETA"
+                        checked={tipoComprobante === 'BOLETA'}
+                        onChange={(e) => setTipoComprobante(e.target.value as 'BOLETA' | 'FACTURA')}
+                        className="w-4 h-4"
+                      />
+                      <div>
+                        <p className="font-medium text-gray-700">Boleta de Venta</p>
+                        <p className="text-xs text-gray-500">Para personas naturales</p>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-blue-50 transition" htmlFor="opcion-factura">
+                      <input
+                        id="opcion-factura"
+                        type="radio"
+                        name="comprobante"
+                        value="FACTURA"
+                        checked={tipoComprobante === 'FACTURA'}
+                        onChange={(e) => setTipoComprobante(e.target.value as 'BOLETA' | 'FACTURA')}
+                        className="w-4 h-4"
+                      />
+                      <div>
+                        <p className="font-medium text-gray-700">Factura</p>
+                        <p className="text-xs text-gray-500">Para empresas (requiere RUC adicional)</p>
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
                 <button
-                  onClick={crearCuenta}
-                  disabled={loading || !email || !password || !nombre}
+                  onClick={solicitarBoleta}
+                  disabled={loading || !email || !nombre}
                   className="btn-primary w-full flex items-center justify-center gap-2"
-                  id="btn-crear-cuenta"
+                  id="btn-solicitar-boleta"
                 >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                  Crear Cuenta y Finalizar
+                  Solicitar Boleta y Finalizar
                 </button>
               </div>
             </div>
           )}
 
-          {/* Cuenta creada exitosamente */}
-          {step === 4 && cuentaCreada && (
+          {/* Boleta solicitada exitosamente */}
+          {step === 4 && boletaSolicitada && (
             <div className="text-center py-8">
               <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
               <h2 className="font-bold text-2xl text-gray-800 mb-2">¡Solicitud Completa!</h2>
               <p className="text-gray-500 mb-6">
-                Su trámite ha sido registrado exitosamente. Recibirá notificaciones en <strong>{email}</strong> sobre el progreso de su solicitud.
+                Su solicitud ha sido procesada exitosamente. La {tipoComprobante === 'BOLETA' ? 'boleta' : 'factura'} será enviada a <strong>{email}</strong>.
               </p>
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 mb-6">
                 <p><strong>📧 Email:</strong> {email}</p>
-                <p className="mt-1"><strong>🔑 Contraseña:</strong> La que acaba de registrar</p>
+                <p className="mt-1"><strong>📋 Comprobante:</strong> {tipoComprobante === 'BOLETA' ? 'Boleta de Venta' : 'Factura'}</p>
                 <p className="mt-2 text-xs text-blue-600">
-                  Use estas credenciales para iniciar sesión y ver los detalles completos de su trámite.
+                  Recibirá notificaciones sobre el estado de su trámite en el correo registrado.
                 </p>
               </div>
               <div className="flex flex-col gap-3">
