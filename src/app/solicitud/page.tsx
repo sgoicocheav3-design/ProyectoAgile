@@ -8,7 +8,7 @@ import {
   Loader2, ArrowLeft, Shield, UserPlus, Mail, ExternalLink, FileText
 } from 'lucide-react';
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
 
 interface NegocioData {
   ruc: string;
@@ -36,8 +36,12 @@ export default function SolicitudPage() {
   // Paso 3: datos del comprobante (antes del pago)
   const [email, setEmail] = useState('');
   const [nombre, setNombre] = useState('');
+  const [dni, setDni] = useState('');
   const [tipoComprobante, setTipoComprobante] = useState<'BOLETA' | 'FACTURA'>('BOLETA');
   const [comprobanteGuardado, setComprobanteGuardado] = useState(false);
+
+  // Datos de comprobante post-pago (para paso 5)
+  const [comprobantePdfUrl, setComprobantePdfUrl] = useState<string | null>(null);
 
   // Track si el negocio ya tiene usuario
   const [negocioYaTieneCuenta, setNegocioYaTieneCuenta] = useState(false);
@@ -185,6 +189,10 @@ export default function SolicitudPage() {
       setError('Complete todos los campos.');
       return;
     }
+    if (tipoComprobante === 'BOLETA' && !/^\d{8}$/.test(dni)) {
+      setError('Para Boleta debe ingresar un DNI válido de 8 dígitos.');
+      return;
+    }
     if (processingRef.current) return;
     processingRef.current = true;
     setLoading(true);
@@ -236,6 +244,7 @@ export default function SolicitudPage() {
           tramiteId: nuevoTramiteId,
           nombre,
           email,
+          dni: tipoComprobante === 'BOLETA' ? dni : undefined,
           tipoComprobante,
         }),
       });
@@ -323,13 +332,19 @@ export default function SolicitudPage() {
           .then((data) => {
             if (data.pagado || data.nuevoEstado) {
               setPagoConfirmado(true);
+              setComprobantePdfUrl(data.datos?.comprobantePdfUrl || null);
+              setStep(5);
             } else {
               setError('El pago no pudo ser verificado. Contacte a soporte.');
             }
           })
-          .catch(() => setPagoConfirmado(true));
+          .catch(() => {
+            setPagoConfirmado(true);
+            setStep(5);
+          });
       } else {
         setPagoConfirmado(true);
+        setStep(5);
       }
     }
   }, []);
@@ -342,6 +357,7 @@ export default function SolicitudPage() {
     { n: 2, label: 'Documentos' },
     { n: 3, label: 'Datos del Comprobante' },
     { n: 4, label: 'Pago' },
+    { n: 5, label: 'Pago Exitoso' },
   ];
 
   return (
@@ -592,6 +608,25 @@ export default function SolicitudPage() {
                     id="input-nombre"
                   />
                 </div>
+                {tipoComprobante === 'BOLETA' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      DNI (8 dígitos)
+                    </label>
+                    <input
+                      type="text"
+                      value={dni}
+                      onChange={(e) => setDni(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                      placeholder="Ej: 12345678"
+                      maxLength={8}
+                      className="input-base"
+                      id="input-dni"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      DNI de la persona natural que solicita la boleta.
+                    </p>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     <Mail className="w-4 h-4 inline mr-1" />
@@ -655,7 +690,7 @@ export default function SolicitudPage() {
 
                 <button
                   onClick={guardarComprobanteYAvanzar}
-                  disabled={loading || !email || !nombre}
+                  disabled={loading || !email || !nombre || (tipoComprobante === 'BOLETA' && !/^\d{8}$/.test(dni))}
                   className="btn-primary w-full flex items-center justify-center gap-2"
                   id="btn-guardar-comprobante"
                 >
@@ -711,29 +746,50 @@ export default function SolicitudPage() {
             </div>
           )}
 
-          {/* Pago confirmado exitosamente — Pantalla final */}
-          {pagoConfirmado && (
+          {/* STEP 5: Pago Exitoso — comprobante enviado al correo */}
+          {step === 5 && (
             <div className="text-center py-8">
-              <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
-              <h2 className="font-bold text-2xl text-gray-800 mb-2">¡Pago Confirmado!</h2>
-              <p className="text-gray-500 mb-6">El pago de <strong>S/. 1.80</strong> ha sido procesado correctamente.</p>
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-10 h-10 text-green-600" />
+              </div>
+              <h2 className="font-bold text-2xl text-gray-800 mb-2">¡Pago Exitoso!</h2>
+              <p className="text-gray-500 mb-2">
+                Su comprobante ha sido enviado al correo <strong className="text-gray-700">{email}</strong>
+              </p>
+              <p className="text-sm text-gray-400 mb-6">
+                {tipoComprobante === 'BOLETA' ? 'Boleta' : 'Factura'} electrónica generada correctamente.
+              </p>
 
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 mb-6 text-left">
                 <p className="mb-1"><strong>Negocio:</strong> {negocio?.razonSocial}</p>
                 <p className="mb-1"><strong>RUC:</strong> {ruc}</p>
-                <p className="mb-1"><strong>Comprobante solicitado:</strong> {tipoComprobante === 'BOLETA' ? 'Boleta de Venta' : 'Factura'}</p>
-                <p className="mb-1"><strong>Email de notificación:</strong> {email}</p>
+                <p className="mb-1"><strong>Comprobante:</strong> {tipoComprobante === 'BOLETA' ? 'Boleta de Venta' : 'Factura'}</p>
+                <p className="mb-1"><strong>Email:</strong> {email}</p>
+                {tipoComprobante === 'BOLETA' && dni && (
+                  <p className="mb-1"><strong>DNI:</strong> {dni}</p>
+                )}
                 <p className="text-xs text-blue-600 mt-2">
-                  Su {tipoComprobante === 'BOLETA' ? 'boleta' : 'factura'} electrónica se generará automáticamente y estará disponible en la sección de detalle del trámite.
+                  Puede descargar su comprobante desde el botón de abajo o consultar el estado de su trámite.
                 </p>
               </div>
 
               <div className="flex flex-col gap-3">
-                <Link href="/consulta" className="btn-primary flex items-center justify-center gap-2">
-                  <Search className="w-4 h-4" />
+                {comprobantePdfUrl && (
+                  <a
+                    href={comprobantePdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-primary flex items-center justify-center gap-2"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Descargar Comprobante
+                  </a>
+                )}
+                <Link href="/consulta" className="text-blue-600 hover:underline text-sm flex items-center justify-center gap-1">
+                  <Search className="w-3 h-3" />
                   Consultar Estado de mi Trámite
                 </Link>
-                <Link href="/" className="text-blue-600 hover:underline text-sm">
+                <Link href="/" className="text-gray-500 hover:text-gray-700 text-xs">
                   Volver al inicio
                 </Link>
               </div>

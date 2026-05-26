@@ -101,6 +101,7 @@ model Tramite {
   // Datos de solicitud de boleta/factura
   emailSolicitante      String?       @map("email_solicitante")
   nombreSolicitante     String?       @map("nombre_solicitante")
+  dniSolicitante        String?       @map("dni_solicitante")
   tipoComprobante       String?       @map("tipo_comprobante") // BOLETA o FACTURA
   fechaInicio           DateTime      @default(now()) @map("fecha_inicio")
   fechaAprobacion       DateTime?     @map("fecha_aprobacion")

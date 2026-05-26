@@ -6,10 +6,19 @@ const GuardarComprobanteSchema = z.object({
   tramiteId: z.string().min(1, 'tramiteId es requerido.'),
   nombre: z.string().min(2, 'Ingrese su nombre completo.'),
   email: z.string().email('Ingrese un email válido.'),
+  dni: z.string().optional(),
   tipoComprobante: z.enum(['BOLETA', 'FACTURA'], {
     errorMap: () => ({ message: 'Tipo de comprobante inválido. Debe ser BOLETA o FACTURA.' }),
   }),
-});
+}).refine(
+  (data) => {
+    if (data.tipoComprobante === 'BOLETA') {
+      return data.dni && /^\d{8}$/.test(data.dni);
+    }
+    return true;
+  },
+  { message: 'Para Boleta debe ingresar un DNI válido (8 dígitos).', path: ['dni'] }
+);
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +30,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: firstError }, { status: 400 });
     }
 
-    const { tramiteId, nombre, email, tipoComprobante } = parseResult.data;
+    const { tramiteId, nombre, email, dni, tipoComprobante } = parseResult.data;
 
     const tramite = await prisma.tramite.findUnique({
       where: { id: tramiteId },
@@ -43,6 +52,7 @@ export async function POST(request: NextRequest) {
       data: {
         emailSolicitante: email.toLowerCase().trim(),
         nombreSolicitante: nombre,
+        dniSolicitante: dni || null,
         tipoComprobante,
       },
     });

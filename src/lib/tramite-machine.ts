@@ -109,6 +109,7 @@ export async function onPagoConfirmado(
       tipoComprobante,
       nombreSolicitante: tramite.nombreSolicitante || undefined,
       emailSolicitante: tramite.emailSolicitante || undefined,
+      dniSolicitante: tramite.dniSolicitante || undefined,
     }, pago.id);
   } catch (error) {
     console.error('[FACTURACION] Error al generar comprobante:', error);
