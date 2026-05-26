@@ -2,8 +2,7 @@ import Link from 'next/link';
 import {
   Shield, Search, FileText, CreditCard, ClipboardCheck
 } from 'lucide-react';
-
-import InspectorMockSystem from '@/components/inspector-mock';
+import ModalAccesoInspector from '@/components/inspector/modal-acceso-inspector';
 
 export default function HomePage() {
   return (
@@ -23,7 +22,7 @@ export default function HomePage() {
               </h1>
             </div>
           </div>
-          <InspectorMockSystem />
+          <ModalAccesoInspector />
         </div>
       </header>
 
