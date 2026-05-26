@@ -33,7 +33,6 @@ declare module 'next-auth/jwt' {
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-      id: 'credenciales-contribuyente',
       name: 'Credenciales',
       credentials: {
         email: { label: 'Email', type: 'email' },
@@ -59,33 +58,6 @@ export const authOptions: NextAuthOptions = {
 
         if (!passwordOk) {
           throw new Error('Credenciales inválidas.');
-        }
-
-        return {
-          id: usuario.id,
-          email: usuario.email,
-          nombre: usuario.nombre,
-          rol: usuario.rol,
-        };
-      },
-    }),
-    CredentialsProvider({
-      id: 'credencial-inspector',
-      name: 'Código de Credencial',
-      credentials: {
-        codigo: { label: 'Código de Credencial', type: 'text', placeholder: 'Ej. INS-001' },
-      },
-      async authorize(credentials) {
-        if (!credentials?.codigo) {
-          throw new Error('El código de credencial es requerido.');
-        }
-
-        const usuario = await prisma.usuario.findUnique({
-          where: { codigoCredencial: credentials.codigo.trim() },
-        });
-
-        if (!usuario || !usuario.activo || usuario.rol !== 'INSPECTOR') {
-          throw new Error('Credencial inválida o cuenta desactivada.');
         }
 
         return {

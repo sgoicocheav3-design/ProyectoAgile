@@ -2,7 +2,6 @@ import Link from 'next/link';
 import {
   Shield, Search, FileText, CreditCard, ClipboardCheck
 } from 'lucide-react';
-import ModalInspectorTrigger from '@/components/inspector/modal-inspector-trigger';
 
 export default function HomePage() {
   return (
@@ -22,7 +21,13 @@ export default function HomePage() {
               </h1>
             </div>
           </div>
-          <ModalInspectorTrigger />
+          <Link
+            href="/login"
+            className="px-4 py-2 text-blue-300 border border-blue-500/30 rounded-lg hover:bg-white/10 transition text-sm font-medium"
+            id="btn-login-inspector"
+          >
+            Iniciar como inspector
+          </Link>
         </div>
       </header>
 
