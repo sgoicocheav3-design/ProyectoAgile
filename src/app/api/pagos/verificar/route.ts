@@ -58,7 +58,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         pagado: true,
         nuevoEstado: asignacion.exito ? 'EN_INSPECCION' : 'PAGADO',
-        datos: asignacion.exito ? asignacion.datos : resultado.datos,
+        datos: {
+          ...resultado.datos,
+          ...asignacion.datos,
+        },
         mensaje: asignacion.exito
           ? 'Pago confirmado. Inspección agendada.'
           : 'Pago confirmado. Comprobante generado.',

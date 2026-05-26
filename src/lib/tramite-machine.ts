@@ -98,21 +98,33 @@ export async function onPagoConfirmado(
   });
 
   // Facturación Electrónica — usar el tipo de comprobante elegido por el usuario
+  const tipoComprobante = (tramite.tipoComprobante as 'BOLETA' | 'FACTURA') || 'BOLETA';
   let comprobante = null;
   try {
-    const tipoComprobante = (tramite.tipoComprobante as 'BOLETA' | 'FACTURA') || 'BOLETA';
     comprobante = await generarComprobante({
       ruc: tramite.negocio.ruc,
       razonSocial: tramite.negocio.razonSocial,
       domicilioFiscal: tramite.negocio.domicilioFiscal,
       monto: Number(pago.monto),
-      tipoComprobante,
+      tipoComprobante: tipoComprobante,
       nombreSolicitante: tramite.nombreSolicitante || undefined,
       emailSolicitante: tramite.emailSolicitante || undefined,
       dniSolicitante: tramite.dniSolicitante || undefined,
     }, pago.id);
   } catch (error) {
     console.error('[FACTURACION] Error al generar comprobante:', error);
+  }
+
+  // Enviar comprobante por email (no blocking)
+  if (comprobante) {
+    const { enviarComprobanteEmail } = await import('./email-service');
+    enviarComprobanteEmail({
+      email: tramite.emailSolicitante || '',
+      nombre: tramite.nombreSolicitante || tramite.negocio.razonSocial,
+      tipoComprobante,
+      serieCorrelativo: comprobante.serie_correlativo,
+      pdfUrl: comprobante.url_pdf,
+    });
   }
 
   // Actualizar pago como aprobado y guardar comprobante

@@ -31,5 +31,10 @@ export const env = {
   get NEXTAUTH_URL() { return process.env.NEXTAUTH_URL || ''; },
   get OPENAI_API_KEY() { return process.env.OPENAI_API_KEY || ''; },
   get NEXT_PUBLIC_ROBOFLOW_API_KEY() { return process.env.NEXT_PUBLIC_ROBOFLOW_API_KEY || ''; },
+  get SMTP_HOST() { return process.env.SMTP_HOST || ''; },
+  get SMTP_PORT() { return process.env.SMTP_PORT || ''; },
+  get SMTP_USER() { return process.env.SMTP_USER || ''; },
+  get SMTP_PASS() { return process.env.SMTP_PASS || ''; },
+  get SMTP_FROM() { return process.env.SMTP_FROM || ''; },
 
 };
