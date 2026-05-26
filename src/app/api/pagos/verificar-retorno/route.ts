@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verificarPago } from '@/lib/mercadopago';
-import { onPagoConfirmado } from '@/lib/tramite-machine';
+import { onPagoConfirmado, asignarInspector } from '@/lib/tramite-machine';
 
 /**
  * POST /api/pagos/verificar-retorno
@@ -93,12 +93,11 @@ async function procesarEstadoMP(
   rawData: Record<string, unknown>
 ) {
   if (status === 'approved') {
-    // Actualizar en Supabase y avanzar el trámite
+    // Actualizar en BD y avanzar el trámite
     const resultado = await onPagoConfirmado(tramiteId, pagoId);
 
     if (!resultado.exito) {
       // El trámite puede ya estar en un estado avanzado (race condition con webhook)
-      // En ese caso, solo actualizar el pago
       await prisma.pago.update({
         where: { id: pagoId },
         data: {
@@ -109,15 +108,26 @@ async function procesarEstadoMP(
         },
       });
       console.warn('[VERIFICAR-RETORNO] onPagoConfirmado falló (posible race condition):', resultado.error);
+      return NextResponse.json({
+        procesado: true,
+        estadoPago: 'APROBADO',
+        mensaje: 'Pago registrado. El trámite será actualizado en breve.',
+      });
+    }
+
+    // Asignar inspector automáticamente
+    const asignacion = await asignarInspector(tramiteId);
+    if (!asignacion.exito) {
+      console.warn('[VERIFICAR-RETORNO] Pago OK pero sin inspector:', asignacion.error);
     }
 
     return NextResponse.json({
       procesado: true,
       estadoPago: 'APROBADO',
-      nuevoEstadoTramite: resultado.exito ? 'EN_INSPECCION' : undefined,
-      mensaje: resultado.exito
+      nuevoEstadoTramite: asignacion.exito ? 'EN_INSPECCION' : 'PAGADO',
+      mensaje: asignacion.exito
         ? 'Pago confirmado. Su inspección ha sido agendada.'
-        : 'Pago registrado. El trámite será actualizado en breve.',
+        : 'Pago confirmado. Se asignará un inspector en breve.',
     });
 
   } else if (status === 'rejected' || status === 'cancelled') {

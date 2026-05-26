@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import axios from 'axios';
 import {
   Search, CheckCircle2, AlertCircle, Upload,
-  Loader2, ArrowLeft, Shield, UserPlus, Mail, ExternalLink
+  Loader2, ArrowLeft, Shield, UserPlus, Mail, ExternalLink, FileText
 } from 'lucide-react';
 
 type Step = 1 | 2 | 3 | 4;
@@ -21,8 +20,6 @@ interface NegocioData {
 }
 
 export default function SolicitudPage() {
-  const router = useRouter();
-
   const [step, setStep] = useState<Step>(1);
   const [ruc, setRuc] = useState('');
   const [negocio, setNegocio] = useState<NegocioData | null>(null);
@@ -36,11 +33,11 @@ export default function SolicitudPage() {
   const [planoValidation, setPlanoValidation] = useState<{ isPlan: boolean; confidence: number; reason: string } | null>(null);
   const [planoValidationError, setPlanoValidationError] = useState<string | null>(null);
 
-  // Paso 4: solicitar boleta
+  // Paso 3: datos del comprobante (antes del pago)
   const [email, setEmail] = useState('');
   const [nombre, setNombre] = useState('');
   const [tipoComprobante, setTipoComprobante] = useState<'BOLETA' | 'FACTURA'>('BOLETA');
-  const [boletaSolicitada, setBoletaSolicitada] = useState(false);
+  const [comprobanteGuardado, setComprobanteGuardado] = useState(false);
 
   // Track si el negocio ya tiene usuario
   const [negocioYaTieneCuenta, setNegocioYaTieneCuenta] = useState(false);
@@ -124,7 +121,6 @@ export default function SolicitudPage() {
 
   // ─────────────────────────────────────────
   // PASO 1: Validar RUC (público, sin auth)
-  // No crea trámite — solo valida y muestra datos del negocio.
   // ─────────────────────────────────────────
   const validarRUC = async () => {
     if (ruc.length !== 11) {
@@ -163,11 +159,9 @@ export default function SolicitudPage() {
   };
 
   // ─────────────────────────────────────────
-  // PASO 2: Validar plano con IA (no se sube aún)
-  // El archivo se mantiene en memoria; la subida real ocurre
-  // al hacer clic en "Pagar" (Paso 3), junto con la creación del trámite.
+  // PASO 2: Validar plano con IA
   // ─────────────────────────────────────────
-  const avanzarAPago = () => {
+  const avanzarAComprobante = () => {
     const validacion = validarPlano(planoFile);
     if (validacion) {
       setError(validacion);
@@ -183,18 +177,21 @@ export default function SolicitudPage() {
   };
 
   // ─────────────────────────────────────────
-  // PASO 3: Crear trámite, subir plano y pagar
-  // Todo ocurre al hacer clic en "Pagar" — el RUC se bloquea
-  // solo en este momento, no antes.
+  // PASO 3: Guardar datos del comprobante, crear trámite y subir plano
+  // Luego avanza al paso 4 (pago)
   // ─────────────────────────────────────────
-  const iniciarPago = async () => {
+  const guardarComprobanteYAvanzar = async () => {
+    if (!email || !nombre) {
+      setError('Complete todos los campos.');
+      return;
+    }
     if (processingRef.current) return;
     processingRef.current = true;
     setLoading(true);
     setError('');
 
     try {
-      // 1. Crear trámite (recién aquí se "bloquea" el RUC)
+      // 1. Crear trámite
       const tramiteRes = await fetch('/api/tramites/crear', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -231,13 +228,53 @@ export default function SolicitudPage() {
         return;
       }
 
-      // 3. Crear preferencia de pago y redirigir
+      // 3. Guardar datos del comprobante (boleta/factura) en el trámite
+      const comprobanteRes = await fetch('/api/tramites/guardar-comprobante', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tramiteId: nuevoTramiteId,
+          nombre,
+          email,
+          tipoComprobante,
+        }),
+      });
+
+      const comprobanteData = await comprobanteRes.json();
+      if (!comprobanteRes.ok) {
+        setError(comprobanteData.error || 'Error al guardar datos del comprobante.');
+        setLoading(false);
+        processingRef.current = false;
+        return;
+      }
+
+      setComprobanteGuardado(true);
+      setStep(4);
+      setLoading(false);
+      processingRef.current = false;
+    } catch {
+      setError('Error de conexión. Intente nuevamente.');
+      setLoading(false);
+      processingRef.current = false;
+    }
+  };
+
+  // ─────────────────────────────────────────
+  // PASO 4: Iniciar pago con MercadoPago
+  // ─────────────────────────────────────────
+  const iniciarPago = async () => {
+    if (processingRef.current) return;
+    processingRef.current = true;
+    setLoading(true);
+    setError('');
+
+    try {
       const baseUrl = window.location.origin;
       const prefRes = await fetch('/api/pagos/crear-preferencia', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tramiteId: nuevoTramiteId,
+          tramiteId,
           backUrlBase: `${baseUrl}/solicitud`,
         }),
       });
@@ -250,7 +287,7 @@ export default function SolicitudPage() {
         return;
       }
 
-      // 4. Redirigir a MercadoPago
+      // Redirigir a MercadoPago
       window.location.href = prefData.initPoint;
     } catch {
       setError('Error de conexión. Intente nuevamente.');
@@ -275,45 +312,17 @@ export default function SolicitudPage() {
     if (status === 'success' && tid) {
       setTramiteId(tid);
       setPagoConfirmado(true);
-      const timer = setTimeout(() => setStep(4), 1500);
-      return () => clearTimeout(timer);
     }
   }, []);
 
   // ─────────────────────────────────────────
-  // PASO 4: Solicitar boleta/factura
+  // STEPPER CONFIG
   // ─────────────────────────────────────────
-  const solicitarBoleta = async () => {
-    if (!email || !nombre) {
-      setError('Complete todos los campos.');
-      return;
-    }
-    setLoading(true);
-    setError('');
-
-    const res = await fetch('/api/auth/crear-cuenta-post-pago', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, nombre, tramiteId, tipoComprobante }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      setError(data.error || 'Error al procesar la solicitud.');
-      setLoading(false);
-      return;
-    }
-
-    setBoletaSolicitada(true);
-    setLoading(false);
-  };
-
   const steps = [
     { n: 1, label: 'Validar RUC' },
     { n: 2, label: 'Documentos' },
-    { n: 3, label: 'Pago' },
-    { n: 4, label: 'Solicitar Boleta' },
+    { n: 3, label: 'Datos del Comprobante' },
+    { n: 4, label: 'Pago' },
   ];
 
   return (
@@ -532,79 +541,24 @@ export default function SolicitudPage() {
               )}
 
               <div className="flex gap-3 mt-6">
-                {/* Botón Atrás eliminado para forzar flujo unidireccional */}
                 <button
-                  onClick={avanzarAPago}
+                  onClick={avanzarAComprobante}
                   disabled={!planoFile || !planoValidation?.isPlan}
                   id="btn-continuar-pago"
                   className="btn-primary flex items-center gap-2"
                 >
-                  Continuar al Pago
+                  Continuar — Datos del Comprobante
                 </button>
               </div>
             </div>
           )}
 
-          {/* STEP 3: Pago vía MercadoPago */}
-          {step === 3 && !pagoConfirmado && (
+          {/* STEP 3: Datos para Boleta/Factura (ANTES del pago) */}
+          {step === 3 && !comprobanteGuardado && (
             <div>
-              <h2 className="font-bold text-xl text-gray-800 mb-1">Paso 3: Realizar Pago</h2>
+              <h2 className="font-bold text-xl text-gray-800 mb-1">Paso 3: Datos para el Comprobante</h2>
               <p className="text-gray-500 text-sm mb-6">
-                El costo de la Licencia Municipal es de <strong className="text-gray-800">S/. 1.80</strong>.
-              </p>
-
-              <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-xl p-6 mb-6">
-                <p className="text-blue-200 text-sm mb-1">Monto a pagar</p>
-                <p className="text-5xl font-black mb-1">S/. 1.80</p>
-                <p className="text-blue-200 text-sm">Tasa de Licencia Municipal de Funcionamiento</p>
-                <hr className="border-blue-500 my-4" />
-                <div className="text-sm space-y-1">
-                  <p><span className="text-blue-300">Negocio:</span> {negocio?.razonSocial}</p>
-                  <p><span className="text-blue-300">RUC:</span> {ruc}</p>
-                  <p><span className="text-blue-300">Vigencia:</span> 1 año desde la aprobación</p>
-                </div>
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800 mb-6">
-                <p className="font-semibold mb-1">Métodos de pago disponibles:</p>
-                <ul className="list-disc list-inside space-y-1 text-blue-700">
-                  <li>Tarjeta de crédito o débito</li>
-                  <li>Yape</li>
-                  <li>Pago en efectivo (agentes autorizados)</li>
-                </ul>
-              </div>
-
-              <div className="flex gap-3">
-                {/* Botón Atrás eliminado para forzar flujo unidireccional */}
-                <button onClick={iniciarPago} disabled={loading} id="btn-pagar" className="btn-primary flex items-center gap-2 flex-1 justify-center">
-                  {loading ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Redirigiendo a MercadoPago...</>
-                  ) : (
-                    <><ExternalLink className="w-4 h-4" /> Pagar S/. 1.80</>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Pago confirmado exitosamente */}
-          {step === 3 && pagoConfirmado && (
-            <div className="text-center py-8">
-              <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
-              <h2 className="font-bold text-2xl text-gray-800 mb-2">¡Pago Confirmado!</h2>
-              <p className="text-gray-500 mb-2">El pago de <strong>S/. 1.80</strong> ha sido procesado correctamente.</p>
-              <Loader2 className="w-5 h-5 animate-spin mx-auto text-blue-600" />
-              <p className="text-sm text-gray-400 mt-2">Avanzando al siguiente paso...</p>
-            </div>
-          )}
-
-          {/* STEP 4: Solicitar Boleta */}
-          {step === 4 && !boletaSolicitada && (
-            <div>
-              <h2 className="font-bold text-xl text-gray-800 mb-1">Paso 4: Solicitar Boleta</h2>
-              <p className="text-gray-500 text-sm mb-6">
-                Ingrese sus datos para que podamos preparar y enviar la boleta o factura de su trámite. 
-                Esta información también se usará para las notificaciones sobre el estado de su solicitud.
+                Elija el tipo de comprobante que necesita para su pago. Esta información se usará para generar la boleta o factura electrónica.
               </p>
 
               <div className="space-y-4">
@@ -666,40 +620,95 @@ export default function SolicitudPage() {
                       />
                       <div>
                         <p className="font-medium text-gray-700">Factura</p>
-                        <p className="text-xs text-gray-500">Para empresas (requiere RUC adicional)</p>
+                        <p className="text-xs text-gray-500">Para empresas (requiere RUC)</p>
                       </div>
                     </label>
                   </div>
                 </div>
 
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+                  <p className="font-semibold mb-1">Importante</p>
+                  <p className="text-xs">
+                    Al hacer clic en &quot;Continuar al Pago&quot; se creará su trámite y se guardarán los datos del comprobante.
+                    Luego podrá realizar el pago a través de MercadoPago.
+                  </p>
+                </div>
+
                 <button
-                  onClick={solicitarBoleta}
+                  onClick={guardarComprobanteYAvanzar}
                   disabled={loading || !email || !nombre}
                   className="btn-primary w-full flex items-center justify-center gap-2"
-                  id="btn-solicitar-boleta"
+                  id="btn-guardar-comprobante"
                 >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                  Solicitar Boleta y Finalizar
+                  {loading ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Guardando datos...</>
+                  ) : (
+                    <><FileText className="w-4 h-4" /> Continuar al Pago</>
+                  )}
                 </button>
               </div>
             </div>
           )}
 
-          {/* Boleta solicitada exitosamente */}
-          {step === 4 && boletaSolicitada && (
+          {/* STEP 4: Pago vía MercadoPago */}
+          {step === 4 && !pagoConfirmado && (
+            <div>
+              <h2 className="font-bold text-xl text-gray-800 mb-1">Paso 4: Realizar Pago</h2>
+              <p className="text-gray-500 text-sm mb-6">
+                El costo de la Licencia Municipal es de <strong className="text-gray-800">S/. 1.80</strong>.
+              </p>
+
+              <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-xl p-6 mb-6">
+                <p className="text-blue-200 text-sm mb-1">Monto a pagar</p>
+                <p className="text-5xl font-black mb-1">S/. 1.80</p>
+                <p className="text-blue-200 text-sm">Tasa de Licencia Municipal de Funcionamiento</p>
+                <hr className="border-blue-500 my-4" />
+                <div className="text-sm space-y-1">
+                  <p><span className="text-blue-300">Negocio:</span> {negocio?.razonSocial}</p>
+                  <p><span className="text-blue-300">RUC:</span> {ruc}</p>
+                  <p><span className="text-blue-300">Comprobante:</span> {tipoComprobante === 'BOLETA' ? 'Boleta de Venta' : 'Factura'}</p>
+                  <p><span className="text-blue-300">Vigencia:</span> 1 año desde la aprobación</p>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800 mb-6">
+                <p className="font-semibold mb-1">Métodos de pago disponibles:</p>
+                <ul className="list-disc list-inside space-y-1 text-blue-700">
+                  <li>Tarjeta de crédito o débito</li>
+                  <li>Yape</li>
+                  <li>Pago en efectivo (agentes autorizados)</li>
+                </ul>
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={iniciarPago} disabled={loading} id="btn-pagar" className="btn-primary flex items-center gap-2 flex-1 justify-center">
+                  {loading ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Redirigiendo a MercadoPago...</>
+                  ) : (
+                    <><ExternalLink className="w-4 h-4" /> Pagar S/. 1.80</>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Pago confirmado exitosamente — Pantalla final */}
+          {pagoConfirmado && (
             <div className="text-center py-8">
               <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
-              <h2 className="font-bold text-2xl text-gray-800 mb-2">¡Solicitud Completa!</h2>
-              <p className="text-gray-500 mb-6">
-                Su solicitud ha sido procesada exitosamente. La {tipoComprobante === 'BOLETA' ? 'boleta' : 'factura'} será enviada a <strong>{email}</strong>.
-              </p>
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 mb-6">
-                <p><strong>📧 Email:</strong> {email}</p>
-                <p className="mt-1"><strong>📋 Comprobante:</strong> {tipoComprobante === 'BOLETA' ? 'Boleta de Venta' : 'Factura'}</p>
-                <p className="mt-2 text-xs text-blue-600">
-                  Recibirá notificaciones sobre el estado de su trámite en el correo registrado.
+              <h2 className="font-bold text-2xl text-gray-800 mb-2">¡Pago Confirmado!</h2>
+              <p className="text-gray-500 mb-6">El pago de <strong>S/. 1.80</strong> ha sido procesado correctamente.</p>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 mb-6 text-left">
+                <p className="mb-1"><strong>Negocio:</strong> {negocio?.razonSocial}</p>
+                <p className="mb-1"><strong>RUC:</strong> {ruc}</p>
+                <p className="mb-1"><strong>Comprobante solicitado:</strong> {tipoComprobante === 'BOLETA' ? 'Boleta de Venta' : 'Factura'}</p>
+                <p className="mb-1"><strong>Email de notificación:</strong> {email}</p>
+                <p className="text-xs text-blue-600 mt-2">
+                  Su {tipoComprobante === 'BOLETA' ? 'boleta' : 'factura'} electrónica se generará automáticamente y estará disponible en la sección de detalle del trámite.
                 </p>
               </div>
+
               <div className="flex flex-col gap-3">
                 <Link href="/consulta" className="btn-primary flex items-center justify-center gap-2">
                   <Search className="w-4 h-4" />
@@ -709,6 +718,14 @@ export default function SolicitudPage() {
                   Volver al inicio
                 </Link>
               </div>
+            </div>
+          )}
+
+          {/* Loading intermedio mientras se procesa el pago */}
+          {step === 3 && loading && comprobanteGuardado === false && (
+            <div className="text-center py-8">
+              <Loader2 className="w-10 h-10 animate-spin text-blue-600 mx-auto mb-4" />
+              <p className="text-gray-600">Creando su trámite y guardando datos...</p>
             </div>
           )}
         </div>

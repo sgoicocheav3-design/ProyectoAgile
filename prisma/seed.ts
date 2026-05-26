@@ -1,20 +1,30 @@
 import { PrismaClient, RolUsuario } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { asignarInspector } from '../src/lib/tramite-machine';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Iniciando seed de datos de demostración...');
 
+  // Limpiar datos previos para empezar limpios
+  await prisma.comentario.deleteMany();
+  await prisma.inspeccion.deleteMany();
+  await prisma.pago.deleteMany();
+  await prisma.documento.deleteMany();
+  await prisma.historialInfraestructura.deleteMany();
+  await prisma.tramite.deleteMany();
+  await prisma.negocio.deleteMany();
+  await prisma.fechaNoHabil.deleteMany();
+  await prisma.usuario.deleteMany();
+
   const hash = (pass: string) => bcrypt.hash(pass, 12);
 
   // ──────────────────────────────────────────
-  // USUARIOS
+  // USUARIOS — 3 inspectores limpios + admin + contribuyente
   // ──────────────────────────────────────────
-  const adminUser = await prisma.usuario.upsert({
-    where: { email: 'admin@demo.pe' },
-    update: {},
-    create: {
+  const adminUser = await prisma.usuario.create({
+    data: {
       email: 'admin@demo.pe',
       passwordHash: await hash('Demo1234!'),
       nombre: 'Administrador Sistema MPT',
@@ -24,37 +34,9 @@ async function main() {
     },
   });
 
-  const inspectorUser = await prisma.usuario.upsert({
-    where: { email: 'inspector@demo.pe' },
-    update: {},
-    create: {
-      email: 'inspector@demo.pe',
-      passwordHash: await hash('Demo1234!'),
-      nombre: 'Inspector Juan Rojas Mendez',
-      rol: RolUsuario.INSPECTOR,
-      dni: '00000002',
-      telefono: '044-234567',
-    },
-  });
-
-  const inspector2User = await prisma.usuario.upsert({
-    where: { email: 'inspector2@demo.pe' },
-    update: {},
-    create: {
-      email: 'inspector2@demo.pe',
-      passwordHash: await hash('Demo1234!'),
-      nombre: 'Inspector María Vásquez Torres',
-      rol: RolUsuario.INSPECTOR,
-      dni: '00000003',
-      telefono: '044-345678',
-    },
-  });
-
-  // Inspectores demo con código INS (para acceso rápido en presentaciones)
-  const inspectorIns1 = await prisma.usuario.upsert({
-    where: { email: 'ins-001@demo.pe' },
-    update: {},
-    create: {
+  // Inspectores demo con código INS (para acceso rápido)
+  const inspector1 = await prisma.usuario.create({
+    data: {
       email: 'ins-001@demo.pe',
       passwordHash: await hash('Demo1234!'),
       nombre: 'Carlos Mendoza García',
@@ -64,10 +46,8 @@ async function main() {
     },
   });
 
-  const inspectorIns2 = await prisma.usuario.upsert({
-    where: { email: 'ins-002@demo.pe' },
-    update: {},
-    create: {
+  const inspector2 = await prisma.usuario.create({
+    data: {
       email: 'ins-002@demo.pe',
       passwordHash: await hash('Demo1234!'),
       nombre: 'Rosa Huamán Vargas',
@@ -77,10 +57,8 @@ async function main() {
     },
   });
 
-  const inspectorIns3 = await prisma.usuario.upsert({
-    where: { email: 'ins-003@demo.pe' },
-    update: {},
-    create: {
+  const inspector3 = await prisma.usuario.create({
+    data: {
       email: 'ins-003@demo.pe',
       passwordHash: await hash('Demo1234!'),
       nombre: 'Miguel Ángel Ruiz Paredes',
@@ -90,10 +68,8 @@ async function main() {
     },
   });
 
-  const contribuyenteUser = await prisma.usuario.upsert({
-    where: { email: 'contribuyente@demo.pe' },
-    update: {},
-    create: {
+  const contribuyenteUser = await prisma.usuario.create({
+    data: {
       email: 'contribuyente@demo.pe',
       passwordHash: await hash('Demo1234!'),
       nombre: 'Carlos Pérez García',
@@ -103,22 +79,19 @@ async function main() {
     },
   });
 
-  console.log('✅ Usuarios creados:', {
-    adminUser: adminUser.email,
-    inspectorUser: inspectorUser.email,
-    inspectorIns1: inspectorIns1.email,
-    inspectorIns2: inspectorIns2.email,
-    inspectorIns3: inspectorIns3.email,
-    contribuyenteUser: contribuyenteUser.email,
+  console.log('✅ Usuarios creados (3 inspectores limpios):', {
+    admin: adminUser.email,
+    inspector1: inspector1.email,
+    inspector2: inspector2.email,
+    inspector3: inspector3.email,
+    contribuyente: contribuyenteUser.email,
   });
 
   // ──────────────────────────────────────────
-  // NEGOCIO (datos reales de Trujillo)
+  // NEGOCIOS
   // ──────────────────────────────────────────
-  const negocio = await prisma.negocio.upsert({
-    where: { ruc: '20481196515' },
-    update: {},
-    create: {
+  const negocio1 = await prisma.negocio.create({
+    data: {
       ruc: '20481196515',
       razonSocial: 'RESTAURANTE EL SABOR TRUJILLANO S.A.C.',
       domicilioFiscal: 'AV. LARCO NRO. 1234 URB. LAS QUINTANAS',
@@ -132,63 +105,8 @@ async function main() {
     },
   });
 
-  // ──────────────────────────────────────────
-  // TRAMITE 1: Estado APROBADO (con licencia)
-  // ──────────────────────────────────────────
-  const tramiteAprobado = await prisma.tramite.upsert({
-    where: { id: 'tramite-aprobado-demo-001' },
-    update: {},
-    create: {
-      id: 'tramite-aprobado-demo-001',
-      negocioId: negocio.id,
-      estado: 'APROBADO',
-      codigoLicencia: 'LIC-TRU-20250115-DEMO0001',
-      qrData: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/verificar/LIC-TRU-20250115-DEMO0001`,
-      licenciaVigenteDesde: new Date('2025-01-15'),
-      licenciaVigenteHasta: new Date('2026-01-15'),
-      fechaAprobacion: new Date('2025-01-15'),
-      esRenovacion: false,
-    },
-  });
-
-  await prisma.pago.upsert({
-    where: { id: 'pago-aprobado-demo-001' },
-    update: {},
-    create: {
-      id: 'pago-aprobado-demo-001',
-      tramiteId: tramiteAprobado.id,
-      monto: 180.00,
-      referenciaPasarela: 'MP-TEST-123456789',
-      preferenceId: 'PREF-TEST-001',
-      estadoPago: 'APROBADO',
-      fechaPago: new Date('2025-01-10'),
-    },
-  });
-
-  await prisma.inspeccion.upsert({
-    where: { id: 'insp-aprobado-demo-001' },
-    update: {},
-    create: {
-      id: 'insp-aprobado-demo-001',
-      tramiteId: tramiteAprobado.id,
-      inspectorId: inspectorUser.id,
-      fechaProgramada: new Date('2025-01-13'),
-      fechaRealizada: new Date('2025-01-13'),
-      resultado: 'CONFORME',
-      numeroVisita: 1,
-      completada: true,
-    },
-  });
-
-  console.log('✅ Trámite APROBADO creado:', tramiteAprobado.id);
-
-  // ──────────────────────────────────────────
-  // TRAMITE 2: Estado EN_INSPECCION
-  // ──────────────────────────────────────────
-  const negocio2 = await prisma.negocio.upsert({
-    where: { ruc: '20132369477' },
-    update: {},
-    create: {
+  const negocio2 = await prisma.negocio.create({
+    data: {
       ruc: '20132369477',
       razonSocial: 'FARMACIA SALUD TOTAL E.I.R.L.',
       domicilioFiscal: 'JR. INDEPENDENCIA NRO. 567 TRUJILLO',
@@ -202,55 +120,8 @@ async function main() {
     },
   });
 
-  const tramiteInspeccion = await prisma.tramite.upsert({
-    where: { id: 'tramite-inspeccion-demo-002' },
-    update: {},
-    create: {
-      id: 'tramite-inspeccion-demo-002',
-      negocioId: negocio2.id,
-      estado: 'EN_INSPECCION',
-    },
-  });
-
-  await prisma.pago.upsert({
-    where: { id: 'pago-inspeccion-demo-002' },
-    update: {},
-    create: {
-      id: 'pago-inspeccion-demo-002',
-      tramiteId: tramiteInspeccion.id,
-      monto: 180.00,
-      referenciaPasarela: 'MP-TEST-987654321',
-      estadoPago: 'APROBADO',
-      fechaPago: new Date(),
-    },
-  });
-
-  // Fecha de inspección = 2 días hábiles desde hoy
-  const fechaInsp = new Date();
-  fechaInsp.setDate(fechaInsp.getDate() + 3);
-
-  await prisma.inspeccion.upsert({
-    where: { id: 'insp-pendiente-demo-002' },
-    update: {},
-    create: {
-      id: 'insp-pendiente-demo-002',
-      tramiteId: tramiteInspeccion.id,
-      inspectorId: inspectorUser.id,
-      fechaProgramada: fechaInsp,
-      numeroVisita: 1,
-      completada: false,
-    },
-  });
-
-  console.log('✅ Trámite EN_INSPECCION creado:', tramiteInspeccion.id);
-
-  // ──────────────────────────────────────────
-  // TRAMITE 3: Estado OBSERVADO / SEGUNDA_INSPECCION
-  // ──────────────────────────────────────────
-  const negocio3 = await prisma.negocio.upsert({
-    where: { ruc: '20481888901' },
-    update: {},
-    create: {
+  const negocio3 = await prisma.negocio.create({
+    data: {
       ruc: '20481888901',
       razonSocial: 'BODEGA LA ESQUINA DE ORO S.R.L.',
       domicilioFiscal: 'CA. UNION NRO. 890 TRUJILLO',
@@ -264,75 +135,8 @@ async function main() {
     },
   });
 
-  const tramiteObservado = await prisma.tramite.upsert({
-    where: { id: 'tramite-observado-demo-003' },
-    update: {},
-    create: {
-      id: 'tramite-observado-demo-003',
-      negocioId: negocio3.id,
-      estado: 'SEGUNDA_INSPECCION',
-    },
-  });
-
-  await prisma.pago.upsert({
-    where: { id: 'pago-observado-demo-003' },
-    update: {},
-    create: {
-      id: 'pago-observado-demo-003',
-      tramiteId: tramiteObservado.id,
-      monto: 180.00,
-      referenciaPasarela: 'MP-TEST-111222333',
-      estadoPago: 'APROBADO',
-      fechaPago: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-    },
-  });
-
-  // Visita 1: Observada (hace 5 días)
-  await prisma.inspeccion.upsert({
-    where: { id: 'insp-obs-v1-demo-003' },
-    update: {},
-    create: {
-      id: 'insp-obs-v1-demo-003',
-      tramiteId: tramiteObservado.id,
-      inspectorId: inspectorUser.id,
-      fechaProgramada: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      fechaRealizada: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      resultado: 'OBSERVADO',
-      observaciones: 'Extintor vencido. Salida de emergencia bloqueada por cajas de mercadería. Área de almacenamiento no coincide con plano presentado. Se requiere corrección antes de la segunda visita.',
-      numeroVisita: 1,
-      completada: true,
-    },
-  });
-
-  // Visita 2: Pendiente (en 10 días)
-  const fechaV2 = new Date();
-  fechaV2.setDate(fechaV2.getDate() + 10);
-  const fechaLimite = new Date();
-  fechaLimite.setDate(fechaLimite.getDate() + 30);
-
-  await prisma.inspeccion.upsert({
-    where: { id: 'insp-obs-v2-demo-003' },
-    update: {},
-    create: {
-      id: 'insp-obs-v2-demo-003',
-      tramiteId: tramiteObservado.id,
-      inspectorId: inspectorUser.id,
-      fechaProgramada: fechaV2,
-      fechaLimite: fechaLimite,
-      numeroVisita: 2,
-      completada: false,
-    },
-  });
-
-  console.log('✅ Trámite SEGUNDA_INSPECCION creado:', tramiteObservado.id);
-
-  // ──────────────────────────────────────────
-  // TRAMITE 4: Estado NEGADO
-  // ──────────────────────────────────────────
-  const negocio4 = await prisma.negocio.upsert({
-    where: { ruc: '20481999002' },
-    update: {},
-    create: {
+  const negocio4 = await prisma.negocio.create({
+    data: {
       ruc: '20481999002',
       razonSocial: 'TIENDA ELECTRO NORTE S.A.C.',
       domicilioFiscal: 'AV. ESPAÑA NRO. 432 TRUJILLO',
@@ -345,35 +149,153 @@ async function main() {
     },
   });
 
-  const tramiteNegado = await prisma.tramite.upsert({
-    where: { id: 'tramite-negado-demo-004' },
-    update: {},
-    create: {
-      id: 'tramite-negado-demo-004',
-      negocioId: negocio4.id,
-      estado: 'NEGADO',
-      motivoNegado: 'Visita #2 rechazada. El establecimiento no corrigió las deficiencias señaladas en la primera inspección: sistema eléctrico con riesgo de cortocircuito, sin licencia de defensa civil actualizada.',
+  console.log('✅ Negocios creados');
+
+  // ──────────────────────────────────────────
+  // TRÁMITES DEMO
+  // 1. APROBADO — con licencia (histórico)
+  // 2. PAGADO — esperando asignación de inspector
+  // 3. PAGADO — esperando asignación de inspector
+  // 4. NEGADO — rechazado
+  // ──────────────────────────────────────────
+
+  // Tramite 1: APROBADO (completo, con licencia)
+  await prisma.tramite.create({
+    data: {
+      id: 'tramite-aprobado-demo-001',
+      negocioId: negocio1.id,
+      estado: 'APROBADO',
+      codigoLicencia: 'LIC-TRU-20250115-DEMO0001',
+      qrData: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/verificar/LIC-TRU-20250115-DEMO0001`,
+      licenciaVigenteDesde: new Date('2025-01-15'),
+      licenciaVigenteHasta: new Date('2026-01-15'),
+      fechaAprobacion: new Date('2025-01-15'),
+      esRenovacion: false,
+      emailSolicitante: 'carlos@example.com',
+      nombreSolicitante: 'Carlos Pérez García',
+      tipoComprobante: 'FACTURA',
     },
   });
 
-  console.log('✅ Trámite NEGADO creado:', tramiteNegado.id);
+  await prisma.pago.create({
+    data: {
+      id: 'pago-aprobado-demo-001',
+      tramiteId: 'tramite-aprobado-demo-001',
+      monto: 180.00,
+      referenciaPasarela: 'MP-TEST-123456789',
+      preferenceId: 'PREF-TEST-001',
+      estadoPago: 'APROBADO',
+      fechaPago: new Date('2025-01-10'),
+    },
+  });
+
+  console.log('✅ Trámite APROBADO creado (sin inspección)');
+
+  // Tramite 2: PAGADO (simula pago reciente, esperando inspector)
+  await prisma.tramite.create({
+    data: {
+      id: 'tramite-pagado-demo-002',
+      negocioId: negocio2.id,
+      estado: 'PAGADO',
+      esRenovacion: false,
+      emailSolicitante: 'maria@example.com',
+      nombreSolicitante: 'María Vásquez Torres',
+      tipoComprobante: 'BOLETA',
+    },
+  });
+
+  await prisma.pago.create({
+    data: {
+      id: 'pago-pagado-demo-002',
+      tramiteId: 'tramite-pagado-demo-002',
+      monto: 1.80,
+      referenciaPasarela: 'MP-TEST-987654321',
+      estadoPago: 'APROBADO',
+      fechaPago: new Date(),
+      comprobanteSerie: 'BBB1',
+      comprobanteNumero: '000001',
+      comprobantePdfUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/comprobante/pago-pagado-demo-002/pdf`,
+    },
+  });
+
+  console.log('✅ Trámite PAGADO #1 creado (esperando inspector)');
+
+  // Tramite 3: PAGADO (otro, para probar balance de carga)
+  await prisma.tramite.create({
+    data: {
+      id: 'tramite-pagado-demo-003',
+      negocioId: negocio3.id,
+      estado: 'PAGADO',
+      esRenovacion: false,
+      emailSolicitante: 'juan@example.com',
+      nombreSolicitante: 'Juan Pérez López',
+      tipoComprobante: 'FACTURA',
+    },
+  });
+
+  await prisma.pago.create({
+    data: {
+      id: 'pago-pagado-demo-003',
+      tramiteId: 'tramite-pagado-demo-003',
+      monto: 1.80,
+      referenciaPasarela: 'MP-TEST-111222333',
+      estadoPago: 'APROBADO',
+      fechaPago: new Date(),
+      comprobanteSerie: 'FFF1',
+      comprobanteNumero: '000001',
+      comprobantePdfUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/comprobante/pago-pagado-demo-003/pdf`,
+    },
+  });
+
+  console.log('✅ Trámite PAGADO #2 creado (esperando inspector)');
+
+  // Tramite 4: NEGADO (terminal)
+  await prisma.tramite.create({
+    data: {
+      id: 'tramite-negado-demo-004',
+      negocioId: negocio4.id,
+      estado: 'NEGADO',
+      motivoNegado: 'El establecimiento no cumple con los requisitos mínimos de seguridad. Sistema eléctrico con riesgo de cortocircuito. Sin licencia de defensa civil actualizada.',
+      esRenovacion: false,
+      emailSolicitante: 'tienda@example.com',
+      nombreSolicitante: 'Tienda Electro Norte',
+      tipoComprobante: 'FACTURA',
+    },
+  });
+
+  await prisma.pago.create({
+    data: {
+      id: 'pago-negado-demo-004',
+      tramiteId: 'tramite-negado-demo-004',
+      monto: 1.80,
+      referenciaPasarela: 'MP-TEST-444555666',
+      estadoPago: 'APROBADO',
+      fechaPago: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    },
+  });
+
+  console.log('✅ Trámite NEGADO creado');
 
   // ──────────────────────────────────────────
-  // FERIADOS NO HÁBILES 2025-2026
+  // FERIADOS NO HÁBILES
   // ──────────────────────────────────────────
   const feriados = [
-    { fecha: new Date('2026-01-01'), motivo: 'Año Nuevo 2026' },
-    { fecha: new Date('2026-04-02'), motivo: 'Jueves Santo 2026' },
-    { fecha: new Date('2026-04-03'), motivo: 'Viernes Santo 2026' },
+    { fecha: new Date('2026-01-01'), motivo: 'Año Nuevo' },
+    { fecha: new Date('2026-04-02'), motivo: 'Jueves Santo' },
+    { fecha: new Date('2026-04-03'), motivo: 'Viernes Santo' },
     { fecha: new Date('2026-05-01'), motivo: 'Día del Trabajo' },
+    { fecha: new Date('2026-06-29'), motivo: 'San Pedro y San Pablo' },
+    { fecha: new Date('2026-07-28'), motivo: 'Fiestas Patrias' },
+    { fecha: new Date('2026-07-29'), motivo: 'Fiestas Patrias' },
+    { fecha: new Date('2026-08-30'), motivo: 'Santa Rosa de Lima' },
+    { fecha: new Date('2026-10-08'), motivo: 'Combate de Angamos' },
+    { fecha: new Date('2026-11-01'), motivo: 'Día de Todos los Santos' },
+    { fecha: new Date('2026-12-08'), motivo: 'Inmaculada Concepción' },
+    { fecha: new Date('2026-12-25'), motivo: 'Navidad' },
   ];
 
   for (const f of feriados) {
-    await prisma.fechaNoHabil.upsert({
-      where: { fecha: f.fecha },
-      update: {},
-      create: f,
-    });
+    await prisma.fechaNoHabil.create({ data: f });
   }
 
   console.log('✅ Feriados registrados');
@@ -381,16 +303,31 @@ async function main() {
   console.log('🎉 Seed completado exitosamente!');
   console.log('');
   console.log('📧 Cuentas de acceso:');
-  console.log('   Admin:         admin@demo.pe        / Demo1234!');
-  console.log('   Inspector:     inspector@demo.pe     / Demo1234!');
-  console.log('   Inspector 2:   inspector2@demo.pe   / Demo1234!');
-  console.log('   Contribuyente: contribuyente@demo.pe / Demo1234!');
+  console.log('   Admin:          admin@demo.pe        / Demo1234!');
+  console.log('   Inspector 1:    ins-001@demo.pe      / Demo1234!');
+  console.log('   Inspector 2:    ins-002@demo.pe      / Demo1234!');
+  console.log('   Inspector 3:    ins-003@demo.pe      / Demo1234!');
+  console.log('   Contribuyente:  contribuyente@demo.pe / Demo1234!');
   console.log('');
   console.log('📋 Trámites demo:');
-  console.log('   APROBADO:          tramite-aprobado-demo-001');
-  console.log('   EN_INSPECCION:     tramite-inspeccion-demo-002');
-  console.log('   SEGUNDA_INSPECCION: tramite-observado-demo-003');
-  console.log('   NEGADO:            tramite-negado-demo-004');
+  console.log('   APROBADO:  tramite-aprobado-demo-001 (con licencia)');
+  console.log('   PAGADO:    tramite-pagado-demo-002 (esperando inspector)');
+  console.log('   PAGADO:    tramite-pagado-demo-003 (esperando inspector)');
+  console.log('   NEGADO:    tramite-negado-demo-004 (rechazado)');
+  console.log('');
+  console.log('🔧 Asignando inspectores a trámites en PAGADO...');
+
+  const tramitesPendientes = ['tramite-pagado-demo-002', 'tramite-pagado-demo-003'];
+  for (const tid of tramitesPendientes) {
+    const result = await asignarInspector(tid);
+    if (result.exito) {
+      const inspNombre = result.datos?.inspectorNombre as string;
+      const fechaProg = result.datos?.fechaProgramada as string;
+      console.log(`   ✓ ${tid} → Inspector: ${inspNombre}, Fecha: ${fechaProg?.slice(0, 10)}`);
+    } else {
+      console.log(`   ✗ ${tid} → Error: ${result.error}`);
+    }
+  }
 }
 
 main()

@@ -273,7 +273,7 @@ export default async function TramiteDetallePage({
                 className="btn-primary w-full flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-sm"
               >
                 <Download className="w-4 h-4" />
-                Descargar {tramite.negocio.ruc.length === 11 ? 'Factura' : 'Boleta'}
+                Descargar {tramite.tipoComprobante === 'FACTURA' ? 'Factura' : 'Boleta'}
               </a>
             </div>
           )}

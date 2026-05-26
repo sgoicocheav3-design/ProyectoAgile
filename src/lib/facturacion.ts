@@ -3,6 +3,10 @@ export interface ComprobanteDatos {
   razonSocial: string;
   domicilioFiscal: string;
   monto: number;
+  tipoComprobante: 'BOLETA' | 'FACTURA';
+  nombreSolicitante?: string;
+  emailSolicitante?: string;
+  dniSolicitante?: string;
 }
 
 export interface ComprobanteResultado {
@@ -15,12 +19,16 @@ export interface ComprobanteResultado {
  * Servicio de Facturación Electrónica (Mock/API Ready)
  * Genera la estructura de datos requerida por un OSE/PSE en Perú
  * para emitir Boletas y Facturas Electrónicas según normativa SUNAT.
+ * El PDF real se genera on-demand en /api/comprobante/[pagoId]/pdf
  */
-export async function generarComprobante(datos: ComprobanteDatos): Promise<ComprobanteResultado> {
-  const isFactura = datos.ruc.length === 11;
-  const tipo_de_comprobante = isFactura ? 1 : 2; // SUNAT: 1=Factura, 2=Boleta (valores varían por OSE)
+export async function generarComprobante(
+  datos: ComprobanteDatos,
+  pagoId?: string
+): Promise<ComprobanteResultado> {
+  const isFactura = datos.tipoComprobante === 'FACTURA';
+  const tipo_de_comprobante = isFactura ? 1 : 2; // SUNAT: 1=Factura, 2=Boleta
   const serie = isFactura ? 'FFF1' : 'BBB1';
-  
+
   // Generar correlativo aleatorio para simulación
   const numero = Math.floor(Math.random() * 100000).toString().padStart(6, '0');
   const correlativo = `${serie}-${numero}`;
@@ -29,6 +37,11 @@ export async function generarComprobante(datos: ComprobanteDatos): Promise<Compr
   const valor_unitario = parseFloat((datos.monto / 1.18).toFixed(2));
   const igv = parseFloat((datos.monto - valor_unitario).toFixed(2));
 
+  // Para Factura: usar datos del negocio (RUC). Para Boleta: usar datos del solicitante (DNI si está disponible)
+  const clienteTipoDoc = isFactura ? 6 : 1; // 6=RUC, 1=DNI
+  const clienteNumDoc = isFactura ? datos.ruc : (datos.dniSolicitante || datos.ruc);
+  const clienteDenominacion = datos.nombreSolicitante || datos.razonSocial;
+
   // JSON Estandarizado para envío a OSE/PSE (Ej. Nubefact, ApisPeru, etc)
   const payload = {
     operacion: "generar_comprobante",
@@ -36,11 +49,11 @@ export async function generarComprobante(datos: ComprobanteDatos): Promise<Compr
     serie: serie,
     numero: parseInt(numero, 10),
     sunat_transaction: 1, // Venta Interna
-    cliente_tipo_de_documento: isFactura ? 6 : 1, // 6=RUC, 1=DNI
-    cliente_numero_de_documento: datos.ruc,
-    cliente_denominacion: datos.razonSocial,
+    cliente_tipo_de_documento: clienteTipoDoc,
+    cliente_numero_de_documento: clienteNumDoc,
+    cliente_denominacion: clienteDenominacion,
     cliente_direccion: datos.domicilioFiscal,
-    cliente_email: "",
+    cliente_email: datos.emailSolicitante || "",
     fecha_de_emision: new Date().toISOString().split('T')[0],
     moneda: 1, // 1 = PEN (Soles)
     porcentaje_de_igv: 18.00,
@@ -68,10 +81,15 @@ export async function generarComprobante(datos: ComprobanteDatos): Promise<Compr
   // Simular llamada de red a la API del proveedor de facturación
   await new Promise(resolve => setTimeout(resolve, 800));
 
-  // Devolver el resultado con URLs simuladas
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const pdfUrl = pagoId
+    ? `${appUrl}/api/comprobante/${pagoId}/pdf`
+    : `${appUrl}/api/comprobante/unknown/pdf`;
+
+  // Devolver el resultado con URL real hacia nuestra API de generación de PDF
   return {
     serie_correlativo: correlativo,
-    url_pdf: `https://mock.ose.pe/comprobantes/${correlativo}.pdf`,
-    url_xml: `https://mock.ose.pe/comprobantes/${correlativo}.xml`
+    url_pdf: pdfUrl,
+    url_xml: pdfUrl.replace('/pdf', '/xml')
   };
 }

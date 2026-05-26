@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verificarPago } from '@/lib/mercadopago';
-import { onPagoConfirmado } from '@/lib/tramite-machine';
+import { onPagoConfirmado, asignarInspector } from '@/lib/tramite-machine';
 
 function verifySignature(
   bodyText: string,
@@ -103,12 +103,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ received: true, error: resultado.error }, { status: 500 });
       }
 
-      console.log('[WEBHOOK MP] Tramite', tramiteId, 'movido a EN_INSPECCION');
+      // Asignar inspector automáticamente
+      const asignacion = await asignarInspector(tramiteId);
+
+      if (!asignacion.exito) {
+        console.warn('[WEBHOOK MP] Pago OK pero no se pudo asignar inspector:', asignacion.error);
+      }
+
+      console.log('[WEBHOOK MP] Tramite', tramiteId, 'movido a', asignacion.exito ? 'EN_INSPECCION' : 'PAGADO');
       return NextResponse.json({
         received: true,
         processed: true,
-        nuevoEstado: 'EN_INSPECCION',
-        datos: resultado.datos,
+        nuevoEstado: asignacion.exito ? 'EN_INSPECCION' : 'PAGADO',
+        datos: asignacion.exito ? asignacion.datos : resultado.datos,
       });
 
     } else if (pagoMP.status === 'rejected' || pagoMP.status === 'cancelled') {

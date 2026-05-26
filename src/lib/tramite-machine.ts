@@ -5,7 +5,7 @@
 
 import { EstadoTramite, ResultadoInspeccion, Prisma } from '@prisma/client';
 import { prisma } from './prisma';
-import { calcularFechaLimiteDiasHabiles, obtenerProximaFechaInspeccion } from './dias-habiles';
+import { calcularFechaLimiteDiasHabiles } from './dias-habiles';
 import { generarCodigoLicencia } from './pdf-generator';
 
 export type TransicionResult = {
@@ -64,8 +64,9 @@ import { generarComprobante } from './facturacion';
 
 /**
  * EVENTO: Pago confirmado (llamado desde webhook MercadoPago)
- * Transición: DOCUMENTOS_PENDIENTES → PAGADO → EN_INSPECCION
- * Agendamiento automático de inspección y generación de Comprobante
+ * Transición: DOCUMENTOS_PENDIENTES → PAGADO
+ * Genera el comprobante (Boleta/Factura) según la selección del usuario.
+ * La asignación del inspector ocurre en un paso posterior.
  */
 export async function onPagoConfirmado(
   tramiteId: string,
@@ -84,65 +85,36 @@ export async function onPagoConfirmado(
     };
   }
 
-  // Buscar inspector disponible (el con menor carga de trabajo)
-  const inspector = await prisma.usuario.findFirst({
-    where: { rol: 'INSPECTOR', activo: true },
-    orderBy: {
-      inspecciones: { _count: 'asc' },
-    },
-  });
-
-  if (!inspector) {
-    return {
-      exito: false,
-      error: 'No hay inspectores disponibles en este momento. Contacte a administración.',
-    };
-  }
-
   // Obtener el monto del pago para la facturación
   const pago = await prisma.pago.findUnique({ where: { id: pagoId } });
   if (!pago) {
     return { exito: false, error: 'Pago no encontrado.' };
   }
 
-  // Calcular próxima fecha disponible (mínimo 2 días hábiles desde hoy)
-  const fechaInspeccion = await obtenerProximaFechaInspeccion();
-
-  // 1. Ejecutar en transacción atómica la aprobación del trámite y la agenda de inspección
-  await prisma.$transaction(async (tx) => {
-    // 1a. Actualizar estado del trámite
-    await tx.tramite.update({
-      where: { id: tramiteId },
-      data: { estado: 'EN_INSPECCION' },
-    });
-
-    // 1b. Crear la inspección agendada (visita #1)
-    await tx.inspeccion.create({
-      data: {
-        tramiteId,
-        inspectorId: inspector.id,
-        fechaProgramada: fechaInspeccion,
-        numeroVisita: 1,
-        completada: false,
-      },
-    });
+  // Actualizar estado del trámite a PAGADO
+  await prisma.tramite.update({
+    where: { id: tramiteId },
+    data: { estado: 'PAGADO' },
   });
 
-  // 2. Facturación Electrónica (fuera de la transacción principal para evitar bloqueos)
+  // Facturación Electrónica — usar el tipo de comprobante elegido por el usuario
   let comprobante = null;
   try {
+    const tipoComprobante = (tramite.tipoComprobante as 'BOLETA' | 'FACTURA') || 'BOLETA';
     comprobante = await generarComprobante({
       ruc: tramite.negocio.ruc,
       razonSocial: tramite.negocio.razonSocial,
       domicilioFiscal: tramite.negocio.domicilioFiscal,
       monto: Number(pago.monto),
-    });
+      tipoComprobante,
+      nombreSolicitante: tramite.nombreSolicitante || undefined,
+      emailSolicitante: tramite.emailSolicitante || undefined,
+    }, pago.id);
   } catch (error) {
     console.error('[FACTURACION] Error al generar comprobante:', error);
-    // Continuamos aunque falle la facturación, se puede reintentar luego
   }
 
-  // 3. Actualizar pago como aprobado y guardar comprobante
+  // Actualizar pago como aprobado y guardar comprobante
   await prisma.pago.update({
     where: { id: pagoId },
     data: {
@@ -157,12 +129,128 @@ export async function onPagoConfirmado(
 
   return {
     exito: true,
+    nuevoEstado: 'PAGADO',
+    datos: {
+      comprobantePdfUrl: comprobante?.url_pdf,
+      comprobanteSerie: comprobante?.serie_correlativo,
+      tipoComprobante: tramite.tipoComprobante,
+    },
+  };
+}
+
+const MAX_INSPECCIONES_POR_DIA = 3;
+
+/**
+ * Asigna un inspector disponible a un trámite en estado PAGADO.
+ * Busca el inspector con menor carga del día (máx. 3 inspecciones/día),
+ * agendas la inspección (visita #1) y transiciona a EN_INSPECCION.
+ */
+export async function asignarInspector(tramiteId: string): Promise<TransicionResult> {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const manana = new Date(hoy);
+  manana.setDate(manana.getDate() + 1);
+  const finDeSemana = new Date(hoy);
+  finDeSemana.setDate(finDeSemana.getDate() + 2);
+
+  const tramite = await prisma.tramite.findUnique({ where: { id: tramiteId } });
+  if (!tramite) return { exito: false, error: 'Trámite no encontrado.' };
+  if (tramite.estado !== 'PAGADO') {
+    return {
+      exito: false,
+      error: `Estado inválido: ${tramite.estado}. Se esperaba PAGADO.`,
+    };
+  }
+
+  // 1. Buscar inspectores activos
+  const inspectores = await prisma.usuario.findMany({
+    where: { rol: 'INSPECTOR', activo: true },
+  });
+
+  if (inspectores.length === 0) {
+    return {
+      exito: false,
+      error: 'No hay inspectores disponibles en el sistema.',
+    };
+  }
+
+  // 2. Contar inspecciones asignadas para hoy y mañana por inspector
+  const inscounts = await Promise.all(
+    inspectores.map(async (insp) => {
+      const countHoy = await prisma.inspeccion.count({
+        where: {
+          inspectorId: insp.id,
+          fechaProgramada: { gte: hoy, lt: manana },
+        },
+      });
+      const countManana = await prisma.inspeccion.count({
+        where: {
+          inspectorId: insp.id,
+          fechaProgramada: { gte: manana, lt: finDeSemana },
+        },
+      });
+      return { inspector: insp, countHoy, countManana };
+    })
+  );
+
+  // 3. Asignar al inspector con menos inspecciones HOY (respetando el máximo)
+  const disponibles = inscounts
+    .filter((i) => i.countHoy < MAX_INSPECCIONES_POR_DIA)
+    .sort((a, b) => a.countHoy - b.countHoy);
+
+  if (disponibles.length === 0) {
+    return {
+      exito: false,
+      error: `Todos los inspectores tienen el máximo de ${MAX_INSPECCIONES_POR_DIA} inspecciones asignadas para hoy. Intente mañana.`,
+    };
+  }
+
+  const seleccionado = disponibles[0];
+
+  // 4. Determinar fecha de la inspección
+  let fechaProgramada: Date;
+  if (seleccionado.countHoy < MAX_INSPECCIONES_POR_DIA) {
+    // Hoy — asignar en un slot posterior (ej. 2 horas después del inicio del día)
+    fechaProgramada = new Date(hoy);
+    fechaProgramada.setHours(9 + seleccionado.countHoy * 2, 0, 0, 0);
+  } else {
+    // Mañana
+    fechaProgramada = new Date(manana);
+    fechaProgramada.setHours(9, 0, 0, 0);
+  }
+
+  // Si la fecha ya pasó, mover a mañana
+  const ahora = new Date();
+  if (fechaProgramada <= ahora) {
+    fechaProgramada = new Date(manana);
+    fechaProgramada.setHours(9, 0, 0, 0);
+  }
+
+  // 5. Transicionar a EN_INSPECCION y crear la inspección
+  await prisma.$transaction(async (tx) => {
+    await tx.tramite.update({
+      where: { id: tramiteId },
+      data: { estado: 'EN_INSPECCION' },
+    });
+
+    await tx.inspeccion.create({
+      data: {
+        tramiteId,
+        inspectorId: seleccionado.inspector.id,
+        fechaProgramada,
+        numeroVisita: 1,
+        completada: false,
+      },
+    });
+  });
+
+  return {
+    exito: true,
     nuevoEstado: 'EN_INSPECCION',
     datos: {
-      inspectorId: inspector.id,
-      inspectorNombre: inspector.nombre,
-      fechaInspeccion: fechaInspeccion.toISOString(),
-      comprobantePdfUrl: comprobante?.url_pdf,
+      inspectorId: seleccionado.inspector.id,
+      inspectorNombre: seleccionado.inspector.nombre,
+      fechaProgramada: fechaProgramada.toISOString(),
     },
   };
 }
