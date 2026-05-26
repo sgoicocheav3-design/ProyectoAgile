@@ -3,6 +3,8 @@ import {
   Shield, Search, FileText, CreditCard, ClipboardCheck
 } from 'lucide-react';
 
+import InspectorMockSystem from '@/components/inspector-mock';
+
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900">
@@ -21,13 +23,7 @@ export default function HomePage() {
               </h1>
             </div>
           </div>
-          <Link
-            href="/login"
-            className="px-4 py-2 text-blue-300 border border-blue-500/30 rounded-lg hover:bg-white/10 transition text-sm font-medium"
-            id="btn-login-inspector"
-          >
-            Iniciar como inspector
-          </Link>
+          <InspectorMockSystem />
         </div>
       </header>
 
