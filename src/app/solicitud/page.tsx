@@ -124,6 +124,7 @@ export default function SolicitudPage() {
 
   // ─────────────────────────────────────────
   // PASO 1: Validar RUC (público, sin auth)
+  // No crea trámite — solo valida y muestra datos del negocio.
   // ─────────────────────────────────────────
   const validarRUC = async () => {
     if (ruc.length !== 11) {
@@ -149,7 +150,6 @@ export default function SolicitudPage() {
 
       setNegocio(data.sunatData || data.negocio);
       setNegocioId(data.negocio?.id || '');
-      setTramiteId(data.tramiteId);
 
       if (data.tramiteExistente) {
         setError(`Ya existe un trámite activo para este RUC (Estado: ${data.estado}). Consulte su estado en la página de consulta.`);
@@ -163,9 +163,11 @@ export default function SolicitudPage() {
   };
 
   // ─────────────────────────────────────────
-  // PASO 2: Subir plano (sin auth, usa tramiteId)
+  // PASO 2: Validar plano con IA (no se sube aún)
+  // El archivo se mantiene en memoria; la subida real ocurre
+  // al hacer clic en "Pagar" (Paso 3), junto con la creación del trámite.
   // ─────────────────────────────────────────
-  const subirPlano = async () => {
+  const avanzarAPago = () => {
     const validacion = validarPlano(planoFile);
     if (validacion) {
       setError(validacion);
@@ -177,38 +179,13 @@ export default function SolicitudPage() {
       return;
     }
 
-    setLoading(true);
-    setError('');
-
-    try {
-      const formData = new FormData();
-      formData.append('file', planoFile!);
-      formData.append('tramiteId', tramiteId);
-      formData.append('tipo', 'PLANO_LOCAL');
-
-      const res = await fetch('/api/documentos/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || 'Error al subir el plano.');
-        setLoading(false);
-        return;
-      }
-
-      setStep(3);
-      setLoading(false);
-    } catch {
-      setError('Error de conexión al subir el archivo.');
-      setLoading(false);
-    }
+    setStep(3);
   };
 
   // ─────────────────────────────────────────
-  // PASO 3: Pago vía MercadoPago Checkout
+  // PASO 3: Crear trámite, subir plano y pagar
+  // Todo ocurre al hacer clic en "Pagar" — el RUC se bloquea
+  // solo en este momento, no antes.
   // ─────────────────────────────────────────
   const iniciarPago = async () => {
     if (processingRef.current) return;
@@ -217,26 +194,64 @@ export default function SolicitudPage() {
     setError('');
 
     try {
-      const baseUrl = window.location.origin;
-      const res = await fetch('/api/pagos/crear-preferencia', {
+      // 1. Crear trámite (recién aquí se "bloquea" el RUC)
+      const tramiteRes = await fetch('/api/tramites/crear', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tramiteId,
-          backUrlBase: `${baseUrl}/solicitud`,
-        }),
+        body: JSON.stringify({ negocioId }),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || 'Error al preparar el pago.');
+      const tramiteData = await tramiteRes.json();
+      if (!tramiteRes.ok) {
+        setError(tramiteData.error || 'Error al crear el trámite.');
         setLoading(false);
         processingRef.current = false;
         return;
       }
 
-      window.location.href = data.initPoint;
+      const nuevoTramiteId = tramiteData.tramiteId;
+      setTramiteId(nuevoTramiteId);
+
+      // 2. Subir plano al trámite
+      const formData = new FormData();
+      formData.append('file', planoFile!);
+      formData.append('tramiteId', nuevoTramiteId);
+      formData.append('tipo', 'PLANO_LOCAL');
+
+      const uploadRes = await fetch('/api/documentos/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) {
+        setError(uploadData.error || 'Error al subir el plano.');
+        setLoading(false);
+        processingRef.current = false;
+        return;
+      }
+
+      // 3. Crear preferencia de pago y redirigir
+      const baseUrl = window.location.origin;
+      const prefRes = await fetch('/api/pagos/crear-preferencia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tramiteId: nuevoTramiteId,
+          backUrlBase: `${baseUrl}/solicitud`,
+        }),
+      });
+
+      const prefData = await prefRes.json();
+      if (!prefRes.ok) {
+        setError(prefData.error || 'Error al preparar el pago.');
+        setLoading(false);
+        processingRef.current = false;
+        return;
+      }
+
+      // 4. Redirigir a MercadoPago
+      window.location.href = prefData.initPoint;
     } catch {
       setError('Error de conexión. Intente nuevamente.');
       setLoading(false);
@@ -523,13 +538,12 @@ export default function SolicitudPage() {
               <div className="flex gap-3 mt-6">
                 {/* Botón Atrás eliminado para forzar flujo unidireccional */}
                 <button
-                  onClick={subirPlano}
-                  disabled={loading || !planoFile || !planoValidation?.isPlan}
-                  id="btn-subir-plano"
+                  onClick={avanzarAPago}
+                  disabled={!planoFile || !planoValidation?.isPlan}
+                  id="btn-continuar-pago"
                   className="btn-primary flex items-center gap-2"
                 >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  Subir y Continuar
+                  Continuar al Pago
                 </button>
               </div>
             </div>

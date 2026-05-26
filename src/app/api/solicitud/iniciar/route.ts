@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { consultarRucConRucPeru } from '@/lib/sunat';
-import { v4 as uuidv4 } from 'uuid';
 
 /**
  * POST /api/solicitud/iniciar
  * Flujo PÚBLICO — no requiere autenticación
- * 1. Valida RUC en SUNAT
- * 2. Crea o recupera el negocio en BD
- * 3. Crea un trámite nuevo
- * 4. Devuelve un token temporal para subida de documentos y pago
+ * Solo valida el RUC en SUNAT y crea/recupera el negocio.
+ * NO crea el trámite — eso ocurre al hacer clic en "Pagar" (Paso 3).
  */
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -22,7 +19,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 1. Validar RUC via rucperu.com (única fuente)
   const resultado = await consultarRucConRucPeru(ruc);
 
   if (!resultado.valido || !resultado.data) {
@@ -34,7 +30,6 @@ export async function POST(request: NextRequest) {
 
   const { data } = resultado;
 
-  // 2. Crear o recuperar negocio
   let negocio = await prisma.negocio.findUnique({ where: { ruc } });
 
   if (!negocio) {
@@ -49,11 +44,9 @@ export async function POST(request: NextRequest) {
         activo: data.estado === 'ACTIVO',
         habido: data.condicion === 'HABIDO',
         tipoContribuyente: data.tipoContribuyente,
-        // usuarioId se asigna después del pago cuando creen cuenta
       },
     });
   } else {
-    // Actualizar datos SUNAT
     negocio = await prisma.negocio.update({
       where: { ruc },
       data: {
@@ -65,13 +58,11 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // 3. Verificar si ya hay un trámite activo para este negocio
+  // Verificar (sin crear) si ya hay un trámite activo
   const tramiteActivo = await prisma.tramite.findFirst({
     where: {
       negocioId: negocio.id,
-      estado: {
-        notIn: ['APROBADO', 'NEGADO'],
-      },
+      estado: { notIn: ['APROBADO', 'NEGADO'] },
     },
   });
 
@@ -91,19 +82,8 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // 4. Crear trámite nuevo
-  const tokenTemporal = uuidv4(); // Token para autenticar operaciones sin cuenta
-
-  const tramite = await prisma.tramite.create({
-    data: {
-      negocioId: negocio.id,
-      estado: 'INICIADO',
-    },
-  });
-
   return NextResponse.json({
     tramiteExistente: false,
-    tramiteId: tramite.id,
     negocio: {
       id: negocio.id,
       ruc: negocio.ruc,
@@ -118,5 +98,5 @@ export async function POST(request: NextRequest) {
       provincia: data.provincia,
       distrito: data.distrito,
     },
-  }, { status: 201 });
+  });
 }

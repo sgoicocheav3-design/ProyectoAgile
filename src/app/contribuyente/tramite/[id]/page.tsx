@@ -145,9 +145,14 @@ export default async function TramiteDetallePage({
             <div>
               <p className="font-bold text-green-800 text-sm">¡Pago procesado correctamente!</p>
               <p className="text-green-700 text-xs mt-0.5">
-                Su pago ha sido validado con MercadoPago y su trámite ha avanzado. 
-                A continuación verá el estado actualizado y la fecha de su inspección programada.
+                Su pago ha sido validado con MercadoPago y su trámite ha avanzado a la etapa de inspección.
               </p>
+              {inspeccion1 && (
+                <p className="text-green-700 text-sm font-semibold mt-2 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  Inspección asignada a: {inspeccion1.inspector.nombre}
+                </p>
+              )}
             </div>
           </div>
         )}
