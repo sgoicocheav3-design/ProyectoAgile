@@ -41,6 +41,7 @@ export default function AccesoInspectorPage() {
   const [loading, setLoading] = useState(false);
   const [currentInspector, setCurrentInspector] = useState<InspectorData | null>(null);
   const [inspecciones, setInspecciones] = useState<InspeccionData[]>([]);
+  const [sinConexionBD, setSinConexionBD] = useState(false);
 
   const handleIngresar = async () => {
     const trimmed = codigo.trim().toUpperCase();
@@ -68,6 +69,7 @@ export default function AccesoInspectorPage() {
 
       setCurrentInspector(data.inspector);
       setInspecciones(data.inspecciones);
+      setSinConexionBD(data.modo === 'sin-conexion-bd');
       setCodigo('');
     } catch {
       setError('Error de conexión. Intente nuevamente.');
@@ -79,6 +81,7 @@ export default function AccesoInspectorPage() {
   const handleCerrarSesion = () => {
     setCurrentInspector(null);
     setInspecciones([]);
+    setSinConexionBD(false);
   };
 
   if (currentInspector) {
@@ -110,6 +113,17 @@ export default function AccesoInspectorPage() {
         </header>
 
         <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+          {sinConexionBD && (
+            <div className="bg-yellow-50 border border-yellow-300 rounded-xl p-4 text-sm text-yellow-800 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold">Sin conexión a la base de datos.</span>{' '}
+                Las inspecciones asignadas se mostrarán aquí automáticamente cuando la BD esté disponible.
+                Ejecuta <code className="bg-yellow-100 px-1 rounded">npx prisma db seed</code> para crear los datos demo.
+              </div>
+            </div>
+          )}
+
           <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl p-6 text-white shadow-lg">
             <div className="flex items-center gap-3 mb-2">
               <User className="w-6 h-6 text-yellow-400" />
@@ -254,7 +268,7 @@ export default function AccesoInspectorPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej: 00000002 o inspector@demo.pe"
+                  placeholder="Ej: INS-001, 00000002 o inspector@demo.pe"
                   value={codigo}
                   onChange={(e) => {
                     setCodigo(e.target.value);
@@ -276,10 +290,11 @@ export default function AccesoInspectorPage() {
               </div>
 
               <p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3 border border-gray-100">
-                <span className="font-semibold">Credenciales reales:</span> Usa{' '}
-                <span className="font-mono text-blue-600">00000002</span> (Inspector Juan Rojas) o{' '}
-                <span className="font-mono text-blue-600">00000003</span> (Inspector María Vásquez).
-                También puedes usar tu correo electrónico.
+                <span className="font-semibold">Acceso rápido:</span> Usa{' '}
+                <span className="font-mono text-blue-600">INS-001</span> (Carlos Mendoza),{' '}
+                <span className="font-mono text-blue-600">INS-002</span> (Rosa Huamán) o{' '}
+                <span className="font-mono text-blue-600">INS-003</span> (Miguel Ruiz).
+                También por DNI o correo electrónico.
               </p>
 
               <button

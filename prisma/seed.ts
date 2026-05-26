@@ -50,6 +50,46 @@ async function main() {
     },
   });
 
+  // Inspectores demo con código INS (para acceso rápido en presentaciones)
+  const inspectorIns1 = await prisma.usuario.upsert({
+    where: { email: 'ins-001@demo.pe' },
+    update: {},
+    create: {
+      email: 'ins-001@demo.pe',
+      passwordHash: await hash('Demo1234!'),
+      nombre: 'Carlos Mendoza García',
+      rol: RolUsuario.INSPECTOR,
+      dni: 'INS-001',
+      telefono: '044-456789',
+    },
+  });
+
+  const inspectorIns2 = await prisma.usuario.upsert({
+    where: { email: 'ins-002@demo.pe' },
+    update: {},
+    create: {
+      email: 'ins-002@demo.pe',
+      passwordHash: await hash('Demo1234!'),
+      nombre: 'Rosa Huamán Vargas',
+      rol: RolUsuario.INSPECTOR,
+      dni: 'INS-002',
+      telefono: '044-567890',
+    },
+  });
+
+  const inspectorIns3 = await prisma.usuario.upsert({
+    where: { email: 'ins-003@demo.pe' },
+    update: {},
+    create: {
+      email: 'ins-003@demo.pe',
+      passwordHash: await hash('Demo1234!'),
+      nombre: 'Miguel Ángel Ruiz Paredes',
+      rol: RolUsuario.INSPECTOR,
+      dni: 'INS-003',
+      telefono: '044-678901',
+    },
+  });
+
   const contribuyenteUser = await prisma.usuario.upsert({
     where: { email: 'contribuyente@demo.pe' },
     update: {},
@@ -63,7 +103,14 @@ async function main() {
     },
   });
 
-  console.log('✅ Usuarios creados:', { adminUser: adminUser.email, inspectorUser: inspectorUser.email, contribuyenteUser: contribuyenteUser.email });
+  console.log('✅ Usuarios creados:', {
+    adminUser: adminUser.email,
+    inspectorUser: inspectorUser.email,
+    inspectorIns1: inspectorIns1.email,
+    inspectorIns2: inspectorIns2.email,
+    inspectorIns3: inspectorIns3.email,
+    contribuyenteUser: contribuyenteUser.email,
+  });
 
   // ──────────────────────────────────────────
   // NEGOCIO (datos reales de Trujillo)
