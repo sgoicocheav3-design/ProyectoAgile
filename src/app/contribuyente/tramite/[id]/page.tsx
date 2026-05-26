@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import {
   CheckCircle2, XCircle, Clock, FileText, Calendar,
-  AlertTriangle, Download, RefreshCw
+  AlertTriangle, Download, RefreshCw, CreditCard
 } from 'lucide-react';
 import { EstadoTramite } from '@prisma/client';
 
@@ -38,9 +38,46 @@ function TimelineStep({
   );
 }
 
-export default async function TramiteDetallePage({ params }: { params: { id: string } }) {
+export default async function TramiteDetallePage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { pago?: string; payment_id?: string; preference_id?: string; status?: string };
+}) {
   const session = await getServerSession(authOptions);
   if (!session) redirect('/login');
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // VERIFICACIÓN ACTIVA DEL PAGO
+  // Cuando MercadoPago redirige al usuario de vuelta, añade payment_id y
+  // status en la URL. Lo usamos para actualizar Supabase ANTES de renderizar,
+  // sin depender del webhook (que no funciona en localhost).
+  // ─────────────────────────────────────────────────────────────────────────
+  const regresoDePago = searchParams.pago === 'success' || searchParams.pago === 'pending';
+  const mpPaymentId = searchParams.payment_id;
+  const mpPreferenceId = searchParams.preference_id;
+  const mpStatus = searchParams.status; // MercadoPago también envía ?status=approved
+
+  if (regresoDePago || mpPaymentId || mpStatus === 'approved') {
+    try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      await fetch(`${appUrl}/api/pagos/verificar-retorno`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tramiteId: params.id,
+          paymentId: mpPaymentId ?? null,
+          preferenceId: mpPreferenceId ?? null,
+        }),
+        // Sin cache — necesitamos datos frescos siempre
+        cache: 'no-store',
+      });
+    } catch (err) {
+      // Si falla la verificación, continuamos igual — no bloqueamos el render
+      console.error('[TramitePage] Error al verificar retorno de pago:', err);
+    }
+  }
 
   const tramite = await prisma.tramite.findUnique({
     where: { id: params.id },
@@ -68,6 +105,8 @@ export default async function TramiteDetallePage({ params }: { params: { id: str
   const inspeccion1 = tramite.inspecciones.find((i) => i.numeroVisita === 1);
   const inspeccion2 = tramite.inspecciones.find((i) => i.numeroVisita === 2);
   const ultimoPago = tramite.pagos[0];
+  const pagoExitoso = searchParams.pago === 'success' || ultimoPago?.estadoPago === 'APROBADO';
+
 
   const estadoConfig: Record<EstadoTramite, { color: string; label: string; desc: string }> = {
     INICIADO:              { color: 'bg-gray-100 text-gray-700', label: 'Iniciado', desc: 'El trámite ha sido creado.' },
@@ -99,6 +138,31 @@ export default async function TramiteDetallePage({ params }: { params: { id: str
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Banner de pago confirmado */}
+        {searchParams.pago === 'success' && (
+          <div className="md:col-span-3 bg-green-50 border border-green-300 rounded-xl px-5 py-4 flex items-start gap-3">
+            <CreditCard className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-green-800 text-sm">¡Pago procesado correctamente!</p>
+              <p className="text-green-700 text-xs mt-0.5">
+                Su pago ha sido validado con MercadoPago y su trámite ha avanzado. 
+                A continuación verá el estado actualizado y la fecha de su inspección programada.
+              </p>
+            </div>
+          </div>
+        )}
+        {searchParams.pago === 'failure' && (
+          <div className="md:col-span-3 bg-red-50 border border-red-300 rounded-xl px-5 py-4 flex items-start gap-3">
+            <XCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-red-800 text-sm">El pago no pudo completarse</p>
+              <p className="text-red-700 text-xs mt-0.5">
+                Su pago fue rechazado o cancelado. Puede intentarlo nuevamente desde la sección de pago.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Columna izquierda: Info */}
         <div className="md:col-span-2 space-y-5">
           {/* Info del negocio */}
@@ -188,6 +252,26 @@ export default async function TramiteDetallePage({ params }: { params: { id: str
             <span className={`px-3 py-1 rounded-full text-sm font-bold ${cfg.color}`}>{cfg.label}</span>
             <p className="text-xs text-gray-500 mt-2">{cfg.desc}</p>
           </div>
+
+          {/* Comprobante de Pago (Factura/Boleta) */}
+          {ultimoPago?.estadoPago === 'APROBADO' && ultimoPago?.comprobantePdfUrl && (
+            <div className="card bg-gray-50 border border-gray-200 text-center">
+              <CreditCard className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+              <p className="font-bold text-gray-700 text-sm mb-1">Comprobante de Pago</p>
+              <p className="text-xs text-gray-500 mb-3">
+                {ultimoPago.comprobanteSerie}-{ultimoPago.comprobanteNumero}
+              </p>
+              <a
+                href={ultimoPago.comprobantePdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary w-full flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-sm"
+              >
+                <Download className="w-4 h-4" />
+                Descargar {tramite.negocio.ruc.length === 11 ? 'Factura' : 'Boleta'}
+              </a>
+            </div>
+          )}
 
           {/* Descarga PDF */}
           {tramite.estado === 'APROBADO' && (

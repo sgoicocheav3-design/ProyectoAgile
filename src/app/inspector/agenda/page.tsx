@@ -15,9 +15,25 @@ export default async function AgendaInspectorPage() {
     redirect('/login');
   }
 
+  // Consultar a Supabase mediante Prisma con las reglas de negocio solicitadas:
+  // 1. Pertenecen al inspector logueado.
+  // 2. El trámite tiene un pago en estado APROBADO.
+  // 3. El trámite ha avanzado a la etapa de inspección (lo cual implica que los planos fueron subidos y validados).
   const inspecciones = await prisma.inspeccion.findMany({
     where: {
       inspectorId: session.user.id,
+      tramite: {
+        // Regla 2: Pago confirmado
+        pagos: {
+          some: {
+            estadoPago: 'APROBADO',
+          },
+        },
+        // Regla 3: El estado actual asume que los pasos previos (Roboflow/planos) fueron exitosos
+        estado: {
+          in: ['EN_INSPECCION', 'OBSERVADO', 'SEGUNDA_INSPECCION', 'APROBADO'],
+        },
+      },
     },
     include: {
       tramite: {

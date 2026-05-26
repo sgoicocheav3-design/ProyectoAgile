@@ -60,10 +60,12 @@ export async function onDocumentosCargados(tramiteId: string): Promise<Transicio
   return { exito: true, nuevoEstado: 'DOCUMENTOS_PENDIENTES' };
 }
 
+import { generarComprobante } from './facturacion';
+
 /**
  * EVENTO: Pago confirmado (llamado desde webhook MercadoPago)
  * Transición: DOCUMENTOS_PENDIENTES → PAGADO → EN_INSPECCION
- * Agendamiento automático de inspección
+ * Agendamiento automático de inspección y generación de Comprobante
  */
 export async function onPagoConfirmado(
   tramiteId: string,
@@ -97,27 +99,24 @@ export async function onPagoConfirmado(
     };
   }
 
+  // Obtener el monto del pago para la facturación
+  const pago = await prisma.pago.findUnique({ where: { id: pagoId } });
+  if (!pago) {
+    return { exito: false, error: 'Pago no encontrado.' };
+  }
+
   // Calcular próxima fecha disponible (mínimo 2 días hábiles desde hoy)
   const fechaInspeccion = await obtenerProximaFechaInspeccion();
 
-  // Ejecutar en transacción atómica
+  // 1. Ejecutar en transacción atómica la aprobación del trámite y la agenda de inspección
   await prisma.$transaction(async (tx) => {
-    // 1. Actualizar estado del trámite
+    // 1a. Actualizar estado del trámite
     await tx.tramite.update({
       where: { id: tramiteId },
       data: { estado: 'EN_INSPECCION' },
     });
 
-    // 2. Actualizar pago como aprobado
-    await tx.pago.update({
-      where: { id: pagoId },
-      data: {
-        estadoPago: 'APROBADO',
-        fechaPago: new Date(),
-      },
-    });
-
-    // 3. Crear la inspección agendada (visita #1)
+    // 1b. Crear la inspección agendada (visita #1)
     await tx.inspeccion.create({
       data: {
         tramiteId,
@@ -129,6 +128,33 @@ export async function onPagoConfirmado(
     });
   });
 
+  // 2. Facturación Electrónica (fuera de la transacción principal para evitar bloqueos)
+  let comprobante = null;
+  try {
+    comprobante = await generarComprobante({
+      ruc: tramite.negocio.ruc,
+      razonSocial: tramite.negocio.razonSocial,
+      domicilioFiscal: tramite.negocio.domicilioFiscal,
+      monto: Number(pago.monto),
+    });
+  } catch (error) {
+    console.error('[FACTURACION] Error al generar comprobante:', error);
+    // Continuamos aunque falle la facturación, se puede reintentar luego
+  }
+
+  // 3. Actualizar pago como aprobado y guardar comprobante
+  await prisma.pago.update({
+    where: { id: pagoId },
+    data: {
+      estadoPago: 'APROBADO',
+      fechaPago: new Date(),
+      comprobanteSerie: comprobante ? comprobante.serie_correlativo.split('-')[0] : null,
+      comprobanteNumero: comprobante ? comprobante.serie_correlativo.split('-')[1] : null,
+      comprobantePdfUrl: comprobante ? comprobante.url_pdf : null,
+      comprobanteXmlUrl: comprobante ? comprobante.url_xml : null,
+    },
+  });
+
   return {
     exito: true,
     nuevoEstado: 'EN_INSPECCION',
@@ -136,6 +162,7 @@ export async function onPagoConfirmado(
       inspectorId: inspector.id,
       inspectorNombre: inspector.nombre,
       fechaInspeccion: fechaInspeccion.toISOString(),
+      comprobantePdfUrl: comprobante?.url_pdf,
     },
   };
 }

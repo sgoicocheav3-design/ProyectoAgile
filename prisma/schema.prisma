@@ -124,6 +124,13 @@ model Pago {
   esRenovacion        Boolean    @default(false) @map("es_renovacion")
   fechaPago           DateTime?  @map("fecha_pago")
   metadatos           Json?      // Datos crudos del webhook
+  
+  // Datos de Facturación Electrónica
+  comprobanteSerie    String?    @map("comprobante_serie")
+  comprobanteNumero   String?    @map("comprobante_numero")
+  comprobantePdfUrl   String?    @map("comprobante_pdf_url")
+  comprobanteXmlUrl   String?    @map("comprobante_xml_url")
+
   createdAt           DateTime   @default(now()) @map("created_at")
   updatedAt           DateTime   @updatedAt @map("updated_at")
 

@@ -1,27 +1,9 @@
-'use client';
-
-import { useState } from 'react';
 import Link from 'next/link';
 import {
-  Building2, Shield, Search, FileText, CreditCard, ClipboardCheck
+  Shield, Search, FileText, CreditCard, ClipboardCheck
 } from 'lucide-react';
-import ModalAcceso from '@/components/inspector/modal-acceso';
-import VistaAgenda from '@/components/inspector/vista-agenda';
-import { InspectorDemo } from '@/lib/inspectores-demo';
 
 export default function HomePage() {
-  const [modalAbierto, setModalAbierto] = useState(false);
-  const [currentInspector, setCurrentInspector] = useState<InspectorDemo | null>(null);
-
-  if (currentInspector) {
-    return (
-      <VistaAgenda
-        inspector={currentInspector}
-        onCerrarSesion={() => setCurrentInspector(null)}
-      />
-    );
-  }
-
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900">
       <header className="bg-blue-950/50 backdrop-blur-sm border-b border-blue-700/30">
@@ -39,13 +21,13 @@ export default function HomePage() {
               </h1>
             </div>
           </div>
-          <button
-            onClick={() => setModalAbierto(true)}
-            className="px-4 py-2 text-blue-300 border border-blue-500/30 rounded-lg hover:bg-white/10 transition text-sm font-medium cursor-pointer"
+          <Link
+            href="/login"
+            className="px-4 py-2 text-blue-300 border border-blue-500/30 rounded-lg hover:bg-white/10 transition text-sm font-medium"
             id="btn-login-inspector"
           >
-            Soy Inspector / Admin
-          </button>
+            Iniciar como inspector
+          </Link>
         </div>
       </header>
 
@@ -63,7 +45,7 @@ export default function HomePage() {
           Sin colas, sin papeleos innecesarios.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6">
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link
             href="/solicitud"
             className="px-10 py-5 bg-yellow-400 text-blue-900 rounded-2xl font-black text-xl hover:bg-yellow-300 transition-all shadow-lg hover:shadow-yellow-400/30 hover:-translate-y-1 flex items-center justify-center gap-3"
@@ -73,15 +55,6 @@ export default function HomePage() {
             Iniciar Solicitud de Licencia
           </Link>
         </div>
-
-        <Link
-          href="/consulta"
-          className="inline-flex items-center gap-2 px-6 py-3 bg-white/10 text-white rounded-xl font-semibold hover:bg-white/20 transition-all border border-white/20"
-          id="btn-consultar-estado"
-        >
-          <Search className="w-5 h-5" />
-          Consultar Estado de mi Trámite
-        </Link>
       </section>
 
       <section className="max-w-6xl mx-auto px-4 pb-16">
@@ -118,7 +91,6 @@ export default function HomePage() {
           <h3 className="text-white font-bold text-xl mb-4">¿Ya tienes una solicitud en proceso?</h3>
           <p className="text-blue-200 mb-6">
             Ingresa tu número de RUC en la sección de consulta para ver el estado actual de tu trámite.
-            Si ya creaste una cuenta durante tu solicitud, puedes ingresar desde el botón de login.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
@@ -128,12 +100,6 @@ export default function HomePage() {
               <Search className="w-4 h-4" />
               Consultar con mi RUC
             </Link>
-            <Link
-              href="/login"
-              className="px-6 py-3 text-blue-300 hover:text-white transition text-sm flex items-center justify-center gap-2"
-            >
-              Iniciar sesión (contribuyentes con cuenta)
-            </Link>
           </div>
         </div>
       </section>
@@ -141,15 +107,6 @@ export default function HomePage() {
       <footer className="bg-blue-950 py-6 text-center text-blue-400 text-sm">
         © 2025 Municipalidad Provincial de Trujillo — Gerencia de Desarrollo Económico
       </footer>
-
-      <ModalAcceso
-        abierto={modalAbierto}
-        onCerrar={() => setModalAbierto(false)}
-        onIngresar={(inspector) => {
-          setCurrentInspector(inspector);
-          setModalAbierto(false);
-        }}
-      />
     </main>
   );
 }

@@ -30,8 +30,18 @@ export default function LoginPage() {
       return;
     }
 
-    // Redirigir según rol (el middleware o la página de destino lo maneja)
-    router.push('/contribuyente/dashboard');
+    // Obtener la sesión para redirigir según el rol
+    const { getSession } = await import('next-auth/react');
+    const session = await getSession();
+    const rol = (session?.user as { rol?: string })?.rol;
+
+    if (rol === 'INSPECTOR') {
+      router.push('/inspector/agenda');
+    } else if (rol === 'ADMINISTRADOR') {
+      router.push('/admin/dashboard');
+    } else {
+      router.push('/contribuyente/dashboard');
+    }
     router.refresh();
   };
 
