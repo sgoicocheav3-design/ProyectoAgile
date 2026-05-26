@@ -45,7 +45,7 @@ export async function GET(
       razonSocialEmisor: 'Municipalidad Provincial de Trujillo',
       domicilioFiscalEmisor: 'Jirón Orbegoso 517, Trujillo, La Libertad',
       clienteTipoDoc: isFactura ? 'RUC' : 'DNI',
-      clienteNumDoc: isFactura ? negocio.ruc : (tramite.nombreSolicitante || negocio.ruc),
+      clienteNumDoc: isFactura ? negocio.ruc : (tramite.dniSolicitante || negocio.ruc),
       clienteDenominacion: tramite.nombreSolicitante || negocio.razonSocial,
       clienteDireccion: negocio.domicilioFiscal,
       clienteEmail: tramite.emailSolicitante || '',
