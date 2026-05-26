@@ -291,9 +291,7 @@ export default function AccesoInspectorPage() {
 
               <p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3 border border-gray-100">
                 <span className="font-semibold">Acceso rápido:</span> Usa{' '}
-                <span className="font-mono text-blue-600">INS-001</span> (Carlos Mendoza),{' '}
-                <span className="font-mono text-blue-600">INS-002</span> (Rosa Huamán) o{' '}
-                <span className="font-mono text-blue-600">INS-003</span> (Miguel Ruiz).
+                <span className="font-mono text-blue-600">INS-001</span> (Carlos Mendoza).
                 También por DNI o correo electrónico.
               </p>
 

@@ -138,21 +138,11 @@ export async function onPagoConfirmado(
   };
 }
 
-const MAX_INSPECCIONES_POR_DIA = 3;
-
 /**
- * Asigna un inspector disponible a un trámite en estado PAGADO.
- * Busca el inspector con menor carga del día (máx. 3 inspecciones/día),
- * agendas la inspección (visita #1) y transiciona a EN_INSPECCION.
+ * Asigna el inspector disponible a un trámite en estado PAGADO.
+ * Busca el primer inspector activo y agenda la inspección (visita #1).
  */
 export async function asignarInspector(tramiteId: string): Promise<TransicionResult> {
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  const manana = new Date(hoy);
-  manana.setDate(manana.getDate() + 1);
-  const finDeSemana = new Date(hoy);
-  finDeSemana.setDate(finDeSemana.getDate() + 2);
-
   const tramite = await prisma.tramite.findUnique({ where: { id: tramiteId } });
   if (!tramite) return { exito: false, error: 'Trámite no encontrado.' };
   if (tramite.estado !== 'PAGADO') {
@@ -162,71 +152,20 @@ export async function asignarInspector(tramiteId: string): Promise<TransicionRes
     };
   }
 
-  // 1. Buscar inspectores activos
-  const inspectores = await prisma.usuario.findMany({
+  const inspector = await prisma.usuario.findFirst({
     where: { rol: 'INSPECTOR', activo: true },
   });
 
-  if (inspectores.length === 0) {
+  if (!inspector) {
     return {
       exito: false,
       error: 'No hay inspectores disponibles en el sistema.',
     };
   }
 
-  // 2. Contar inspecciones asignadas para hoy y mañana por inspector
-  const inscounts = await Promise.all(
-    inspectores.map(async (insp) => {
-      const countHoy = await prisma.inspeccion.count({
-        where: {
-          inspectorId: insp.id,
-          fechaProgramada: { gte: hoy, lt: manana },
-        },
-      });
-      const countManana = await prisma.inspeccion.count({
-        where: {
-          inspectorId: insp.id,
-          fechaProgramada: { gte: manana, lt: finDeSemana },
-        },
-      });
-      return { inspector: insp, countHoy, countManana };
-    })
-  );
+  const fechaProgramada = new Date();
+  fechaProgramada.setHours(fechaProgramada.getHours() + 2, 0, 0, 0);
 
-  // 3. Asignar al inspector con menos inspecciones HOY (respetando el máximo)
-  const disponibles = inscounts
-    .filter((i) => i.countHoy < MAX_INSPECCIONES_POR_DIA)
-    .sort((a, b) => a.countHoy - b.countHoy);
-
-  if (disponibles.length === 0) {
-    return {
-      exito: false,
-      error: `Todos los inspectores tienen el máximo de ${MAX_INSPECCIONES_POR_DIA} inspecciones asignadas para hoy. Intente mañana.`,
-    };
-  }
-
-  const seleccionado = disponibles[0];
-
-  // 4. Determinar fecha de la inspección
-  let fechaProgramada: Date;
-  if (seleccionado.countHoy < MAX_INSPECCIONES_POR_DIA) {
-    // Hoy — asignar en un slot posterior (ej. 2 horas después del inicio del día)
-    fechaProgramada = new Date(hoy);
-    fechaProgramada.setHours(9 + seleccionado.countHoy * 2, 0, 0, 0);
-  } else {
-    // Mañana
-    fechaProgramada = new Date(manana);
-    fechaProgramada.setHours(9, 0, 0, 0);
-  }
-
-  // Si la fecha ya pasó, mover a mañana
-  const ahora = new Date();
-  if (fechaProgramada <= ahora) {
-    fechaProgramada = new Date(manana);
-    fechaProgramada.setHours(9, 0, 0, 0);
-  }
-
-  // 5. Transicionar a EN_INSPECCION y crear la inspección
   await prisma.$transaction(async (tx) => {
     await tx.tramite.update({
       where: { id: tramiteId },
@@ -236,7 +175,7 @@ export async function asignarInspector(tramiteId: string): Promise<TransicionRes
     await tx.inspeccion.create({
       data: {
         tramiteId,
-        inspectorId: seleccionado.inspector.id,
+        inspectorId: inspector.id,
         fechaProgramada,
         numeroVisita: 1,
         completada: false,
@@ -248,8 +187,8 @@ export async function asignarInspector(tramiteId: string): Promise<TransicionRes
     exito: true,
     nuevoEstado: 'EN_INSPECCION',
     datos: {
-      inspectorId: seleccionado.inspector.id,
-      inspectorNombre: seleccionado.inspector.nombre,
+      inspectorId: inspector.id,
+      inspectorNombre: inspector.nombre,
       fechaProgramada: fechaProgramada.toISOString(),
     },
   };

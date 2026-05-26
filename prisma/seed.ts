@@ -1,6 +1,31 @@
+import fs from 'fs';
+import path from 'path';
 import { PrismaClient, RolUsuario } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { asignarInspector } from '../src/lib/tramite-machine';
+
+function loadEnvFile(fileName: string) {
+  const envPath = path.resolve(process.cwd(), fileName);
+  if (!fs.existsSync(envPath)) return;
+
+  for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    if (!match) continue;
+
+    const key = match[1];
+    let value = match[2].trim();
+    if (value.startsWith('"') && value.endsWith('"')) {
+      value = value.slice(1, -1);
+    }
+
+    if (process.env[key] === undefined) {
+      process.env[key] = value;
+    }
+  }
+}
+
+loadEnvFile('.env.local');
+loadEnvFile('.env');
 
 const prisma = new PrismaClient();
 
@@ -21,7 +46,7 @@ async function main() {
   const hash = (pass: string) => bcrypt.hash(pass, 12);
 
   // ──────────────────────────────────────────
-  // USUARIOS — 3 inspectores limpios + admin + contribuyente
+  // USUARIOS — 1 inspector + admin + contribuyente
   // ──────────────────────────────────────────
   const adminUser = await prisma.usuario.create({
     data: {
@@ -34,37 +59,15 @@ async function main() {
     },
   });
 
-  // Inspectores demo con código INS (para acceso rápido)
+  // Inspector demo con código INS (para acceso rápido)
   const inspector1 = await prisma.usuario.create({
     data: {
-      email: 'ins-001@demo.pe',
+      email: 'inspector@demo.pe',
       passwordHash: await hash('Demo1234!'),
       nombre: 'Carlos Mendoza García',
       rol: RolUsuario.INSPECTOR,
       dni: 'INS-001',
       telefono: '044-456789',
-    },
-  });
-
-  const inspector2 = await prisma.usuario.create({
-    data: {
-      email: 'ins-002@demo.pe',
-      passwordHash: await hash('Demo1234!'),
-      nombre: 'Rosa Huamán Vargas',
-      rol: RolUsuario.INSPECTOR,
-      dni: 'INS-002',
-      telefono: '044-567890',
-    },
-  });
-
-  const inspector3 = await prisma.usuario.create({
-    data: {
-      email: 'ins-003@demo.pe',
-      passwordHash: await hash('Demo1234!'),
-      nombre: 'Miguel Ángel Ruiz Paredes',
-      rol: RolUsuario.INSPECTOR,
-      dni: 'INS-003',
-      telefono: '044-678901',
     },
   });
 
@@ -79,11 +82,9 @@ async function main() {
     },
   });
 
-  console.log('✅ Usuarios creados (3 inspectores limpios):', {
+  console.log('✅ Usuarios creados (1 inspector):', {
     admin: adminUser.email,
-    inspector1: inspector1.email,
-    inspector2: inspector2.email,
-    inspector3: inspector3.email,
+    inspector: inspector1.email,
     contribuyente: contribuyenteUser.email,
   });
 
@@ -303,11 +304,9 @@ async function main() {
   console.log('🎉 Seed completado exitosamente!');
   console.log('');
   console.log('📧 Cuentas de acceso:');
-  console.log('   Admin:          admin@demo.pe        / Demo1234!');
-  console.log('   Inspector 1:    ins-001@demo.pe      / Demo1234!');
-  console.log('   Inspector 2:    ins-002@demo.pe      / Demo1234!');
-  console.log('   Inspector 3:    ins-003@demo.pe      / Demo1234!');
-  console.log('   Contribuyente:  contribuyente@demo.pe / Demo1234!');
+  console.log('   Admin:          admin@demo.pe          / Demo1234!');
+  console.log('   Inspector:      inspector@demo.pe      / Demo1234!');
+  console.log('   Contribuyente:  contribuyente@demo.pe   / Demo1234!');
   console.log('');
   console.log('📋 Trámites demo:');
   console.log('   APROBADO:  tramite-aprobado-demo-001 (con licencia)');

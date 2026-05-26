@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 const FALLBACK_IDENTITY: Record<string, { id: string; nombre: string; dni: string; email: string; rol: string }> = {
-  'INS-001': { id: 'demo-ins-001', nombre: 'Carlos Mendoza García', dni: 'INS-001', email: 'ins-001@demo.pe', rol: 'INSPECTOR' },
-  'INS-002': { id: 'demo-ins-002', nombre: 'Rosa Huamán Vargas', dni: 'INS-002', email: 'ins-002@demo.pe', rol: 'INSPECTOR' },
-  'INS-003': { id: 'demo-ins-003', nombre: 'Miguel Ángel Ruiz Paredes', dni: 'INS-003', email: 'ins-003@demo.pe', rol: 'INSPECTOR' },
+  'INS-001': { id: 'demo-ins-001', nombre: 'Carlos Mendoza García', dni: 'INS-001', email: 'inspector@demo.pe', rol: 'INSPECTOR' },
 };
 
 export async function POST(request: NextRequest) {

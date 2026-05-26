@@ -303,15 +303,34 @@ export default function SolicitudPage() {
     };
   }, [planoPreview]);
 
-  // Detectar retorno desde MercadoPago
+  // Detectar retorno desde MercadoPago y verificar el pago
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const status = params.get('pago');
     const tid = params.get('tramiteId') || params.get('external_reference');
+    const paymentId = params.get('payment_id');
 
     if (status === 'success' && tid) {
       setTramiteId(tid);
-      setPagoConfirmado(true);
+      // Verificar el pago contra la API de MercadoPago para cambiar estado y generar comprobante
+      if (paymentId) {
+        fetch('/api/pagos/verificar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tramiteId: tid, paymentId }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.pagado || data.nuevoEstado) {
+              setPagoConfirmado(true);
+            } else {
+              setError('El pago no pudo ser verificado. Contacte a soporte.');
+            }
+          })
+          .catch(() => setPagoConfirmado(true));
+      } else {
+        setPagoConfirmado(true);
+      }
     }
   }, []);
 
