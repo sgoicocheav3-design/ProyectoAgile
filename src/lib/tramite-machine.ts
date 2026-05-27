@@ -181,9 +181,6 @@ export async function asignarInspector(tramiteId: string): Promise<TransicionRes
     };
   }
 
-  const fechaProgramada = new Date();
-  fechaProgramada.setHours(fechaProgramada.getHours() + 2, 0, 0, 0);
-
   await prisma.$transaction(async (tx) => {
     await tx.tramite.update({
       where: { id: tramiteId },
@@ -194,7 +191,6 @@ export async function asignarInspector(tramiteId: string): Promise<TransicionRes
       data: {
         tramiteId,
         inspectorId: inspector.id,
-        fechaProgramada,
         numeroVisita: 1,
         completada: false,
       },
@@ -207,7 +203,6 @@ export async function asignarInspector(tramiteId: string): Promise<TransicionRes
     datos: {
       inspectorId: inspector.id,
       inspectorNombre: inspector.nombre,
-      fechaProgramada: fechaProgramada.toISOString(),
     },
   };
 }

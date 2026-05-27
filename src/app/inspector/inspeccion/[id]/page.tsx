@@ -151,12 +151,19 @@ export default async function DetalleInspeccionPage({
                 <Calendar className="w-3.5 h-3.5 text-gray-400" />
                 Fecha Programada:
               </span>
-              <p className="font-semibold text-gray-800">
-                {inspeccion.fechaProgramada.toLocaleDateString('es-PE', {
-                  weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
-                  timeZone: 'America/Lima',
-                })}
-              </p>
+              {inspeccion.fechaProgramada ? (
+                <p className="font-semibold text-gray-800">
+                  {inspeccion.fechaProgramada.toLocaleDateString('es-PE', {
+                    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+                    timeZone: 'America/Lima',
+                  })}
+                </p>
+              ) : (
+                <p className="font-semibold text-amber-600 flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Sin asignar
+                </p>
+              )}
             </div>
             <div>
               <span className="text-gray-500 flex items-center gap-1">
@@ -234,12 +241,12 @@ export default async function DetalleInspeccionPage({
           </div>
         )}
 
-        {/* Reprogramar visita (solo si no está completada) */}
+        {/* Reprogramar / Asignar fecha (solo si no está completada) */}
         {!inspeccion.completada && (
-          <div className="card border-2 border-orange-100">
+          <div className={`card border-2 ${inspeccion.fechaProgramada ? 'border-orange-100' : 'border-blue-200 bg-blue-50/50'}`}>
             <ReprogramarInspeccion
               inspeccionId={inspeccion.id}
-              fechaActual={inspeccion.fechaProgramada.toISOString()}
+              fechaActual={inspeccion.fechaProgramada?.toISOString() ?? null}
             />
           </div>
         )}

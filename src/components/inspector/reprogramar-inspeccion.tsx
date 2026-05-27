@@ -9,16 +9,22 @@ export default function ReprogramarInspeccion({
   fechaActual,
 }: {
   inspeccionId: string;
-  fechaActual: string;
+  fechaActual: string | null;
 }) {
   const router = useRouter();
   const [expandido, setExpandido] = useState(false);
   const [nuevaFecha, setNuevaFecha] = useState(
-    new Date(fechaActual).toISOString().slice(0, 16)
+    fechaActual
+      ? new Date(fechaActual).toISOString().slice(0, 16)
+      : new Date().toISOString().slice(0, 16)
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [exito, setExito] = useState('');
+
+  const tieneFecha = fechaActual !== null;
+  const tituloBoton = tieneFecha ? 'Reprogramar Visita' : 'Asignar Fecha de Inspección';
+  const tituloFormulario = tieneFecha ? 'Nueva fecha y hora de la visita:' : 'Seleccione la fecha y hora de la inspección:';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,12 +41,12 @@ export default function ReprogramarInspeccion({
 
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Error al reprogramar.');
+        setError(data.error || 'Error al guardar la fecha.');
         setLoading(false);
         return;
       }
 
-      setExito(`Visita reprogramada para el ${new Date(data.fechaProgramada).toLocaleDateString('es-PE', {
+      setExito(`Visita ${tieneFecha ? 'reprogramada' : 'programada'} para el ${new Date(data.fechaProgramada).toLocaleDateString('es-PE', {
         weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
         hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
       })}`);
@@ -57,14 +63,18 @@ export default function ReprogramarInspeccion({
       {!expandido ? (
         <button
           onClick={() => setExpandido(true)}
-          className="w-full py-2.5 border-2 border-dashed border-orange-300 rounded-lg text-orange-600 hover:border-orange-500 hover:bg-orange-50 transition text-sm font-medium flex items-center justify-center gap-2"
+          className={`w-full py-2.5 border-2 border-dashed rounded-lg transition text-sm font-medium flex items-center justify-center gap-2 ${
+            tieneFecha
+              ? 'border-orange-300 text-orange-600 hover:border-orange-500 hover:bg-orange-50'
+              : 'border-blue-300 text-blue-600 hover:border-blue-500 hover:bg-blue-50'
+          }`}
         >
           <Calendar className="w-4 h-4" />
-          Reprogramar Visita
+          {tituloBoton}
         </button>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-3 animate-fade-in">
-          <p className="text-sm font-semibold text-gray-700">Nueva fecha y hora de la visita:</p>
+          <p className="text-sm font-semibold text-gray-700">{tituloFormulario}</p>
 
           {error && (
             <div className="p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs flex items-center gap-1.5">
@@ -100,7 +110,7 @@ export default function ReprogramarInspeccion({
               className="btn-primary flex items-center gap-2 text-sm"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
-              Guardar nueva fecha
+              {tieneFecha ? 'Guardar nueva fecha' : 'Establecer fecha'}
             </button>
           </div>
         </form>

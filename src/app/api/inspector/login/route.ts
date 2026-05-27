@@ -73,11 +73,11 @@ export async function POST(request: NextRequest) {
             idTramite: i.tramite.id,
             contribuyente: i.tramite.negocio.razonSocial,
             direccion: i.tramite.negocio.domicilioFiscal,
-            fechaProgramada: i.fechaProgramada.toISOString(),
-            hora: i.fechaProgramada.toLocaleTimeString('es-PE', {
+            fechaProgramada: i.fechaProgramada?.toISOString() ?? null,
+            hora: i.fechaProgramada?.toLocaleTimeString('es-PE', {
               hour: '2-digit',
               minute: '2-digit',
-            }),
+            }) ?? null,
             numeroVisita: i.numeroVisita,
             resultado: i.resultado,
             ruc: i.tramite.negocio.ruc,

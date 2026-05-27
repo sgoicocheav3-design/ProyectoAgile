@@ -128,7 +128,7 @@ async function procesarEstadoMP(
       estadoPago: 'APROBADO',
       nuevoEstadoTramite: asignacion.exito ? 'EN_INSPECCION' : 'PAGADO',
       mensaje: asignacion.exito
-        ? 'Pago confirmado. Su inspección ha sido agendada.'
+        ? 'Pago confirmado. Se ha asignado un inspector, pendiente de programar la visita.'
         : 'Pago confirmado. Se asignará un inspector en breve.',
     });
 

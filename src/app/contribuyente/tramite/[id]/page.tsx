@@ -218,7 +218,7 @@ export default async function TramiteDetallePage({
                   titulo={`Inspección #2 — ${inspeccion2.completada ? (inspeccion2.resultado === 'CONFORME' ? 'Aprobada ✓' : 'Rechazada ✗') : 'Programada'}`}
                   descripcion={inspeccion2.completada
                     ? inspeccion2.observaciones || undefined
-                    : `Programada: ${new Date(inspeccion2.fechaProgramada).toLocaleDateString('es-PE')} | Límite: ${inspeccion2.fechaLimite ? new Date(inspeccion2.fechaLimite).toLocaleDateString('es-PE') : 'N/A'}`
+                    : `Programada: ${inspeccion2.fechaProgramada ? new Date(inspeccion2.fechaProgramada).toLocaleDateString('es-PE') : 'Pendiente de asignación'} | Límite: ${inspeccion2.fechaLimite ? new Date(inspeccion2.fechaLimite).toLocaleDateString('es-PE') : 'N/A'}`
                   }
                   fecha={inspeccion2.fechaRealizada || inspeccion2.fechaProgramada}
                   tipo={inspeccion2.completada
@@ -335,7 +335,9 @@ export default async function TramiteDetallePage({
                     {tramite.estado === 'SEGUNDA_INSPECCION' ? 'Segunda Visita Programada' : 'Inspección Programada'}
                   </p>
                   <p className="text-indigo-600 text-xs">
-                    {new Date(insp.fechaProgramada).toLocaleDateString('es-PE', { dateStyle: 'full', timeZone: 'America/Lima' })}
+                    {insp.fechaProgramada
+                      ? new Date(insp.fechaProgramada).toLocaleDateString('es-PE', { dateStyle: 'full', timeZone: 'America/Lima' })
+                      : 'Fecha pendiente de asignación'}
                   </p>
                   <p className="text-xs text-indigo-500 mt-1">Inspector: {insp.inspector.nombre}</p>
                   {insp.fechaLimite && (

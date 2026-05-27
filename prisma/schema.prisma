@@ -148,7 +148,7 @@ model Inspeccion {
   id               String              @id @default(cuid())
   tramiteId        String              @map("tramite_id")
   inspectorId      String              @map("inspector_id")
-  fechaProgramada  DateTime            @map("fecha_programada")
+  fechaProgramada  DateTime?           @map("fecha_programada")
   fechaRealizada   DateTime?           @map("fecha_realizada")
   resultado        ResultadoInspeccion?
   observaciones    String?             @db.Text

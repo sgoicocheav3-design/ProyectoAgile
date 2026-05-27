@@ -8,11 +8,12 @@ import {
   MapPin,
   Clock,
   Eye,
+  AlertTriangle,
 } from 'lucide-react';
 
 export interface InspeccionCalendario {
   id: string;
-  fechaProgramada: string;
+  fechaProgramada: string | null;
   completada: boolean;
   resultado: 'CONFORME' | 'OBSERVADO' | 'RECHAZADO' | null;
   numeroVisita: number;
@@ -81,10 +82,11 @@ export default function CalendarioInspecciones({
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [selectedDate, setSelectedDate] = useState<Date | null>(today);
 
-  // Build inspection map by date key (YYYY-MM-DD)
+  // Build inspection map by date key (YYYY-MM-DD) — only for inspections with dates
   const inspeccionesPorDia = useMemo(() => {
     const map = new Map<string, InspeccionCalendario[]>();
     inspecciones.forEach((insp) => {
+      if (!insp.fechaProgramada) return;
       const d = new Date(insp.fechaProgramada);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       if (!map.has(key)) map.set(key, []);
@@ -146,11 +148,17 @@ export default function CalendarioInspecciones({
       const key = getDateKey(selectedDate);
       return inspeccionesPorDia.get(key) || [];
     }
-    // Show upcoming inspections (from today onwards)
+    // Show upcoming inspections (from today onwards) — exclude null dates
     return inspecciones
-      .filter((i) => new Date(i.fechaProgramada) >= today && !i.completada)
+      .filter((i) => i.fechaProgramada && new Date(i.fechaProgramada) >= today && !i.completada)
       .slice(0, 5);
   }, [selectedDate, inspeccionesPorDia, inspecciones, today]);
+
+  // Inspections without a date assigned yet
+  const inspeccionesSinFecha = useMemo(
+    () => inspecciones.filter((i) => !i.fechaProgramada && !i.completada),
+    [inspecciones]
+  );
 
   const tituloLista = selectedDate
     ? `Inspecciones del ${selectedDate.toLocaleDateString('es-PE', { weekday: 'long', day: '2-digit', month: 'long', timeZone: 'America/Lima' })}`
@@ -269,7 +277,54 @@ export default function CalendarioInspecciones({
           {tituloLista}
         </h2>
 
-        {inspeccionesFiltradas.length === 0 ? (
+        {inspeccionesSinFecha.length > 0 && (
+          <div className="mb-6">
+            <h3 className="font-bold text-amber-700 text-sm mb-2 flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4" />
+              Sin fecha asignada ({inspeccionesSinFecha.length})
+            </h3>
+            <div className="space-y-2">
+              {inspeccionesSinFecha.map((insp) => (
+                <Link
+                  key={insp.id}
+                  href={`/inspector/inspeccion/${insp.id}`}
+                  className="card border-l-4 border-amber-400 flex items-center justify-between hover:shadow-md transition-shadow group bg-amber-50/30"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                        insp.numeroVisita === 1
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-purple-100 text-purple-700'
+                      }`}>
+                        Visita #{insp.numeroVisita}
+                      </span>
+                      <span className="px-2 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-700">
+                        Pendiente
+                      </span>
+                    </div>
+                    <h3 className="font-bold text-gray-800 truncate">{insp.negocioRazonSocial}</h3>
+                    <p className="text-sm text-gray-500">RUC: {insp.negocioRuc}</p>
+                    <p className="text-sm text-gray-500 flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5" />
+                      {insp.negocioDomicilio}
+                    </p>
+                  </div>
+                  <div className="ml-4 flex items-center gap-1 text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Eye className="w-4 h-4" />
+                    <span className="text-xs font-medium">Asignar fecha</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {inspeccionesFiltradas.length === 0 && !selectedDate ? (
+          <div className="card text-center py-8 text-gray-400 text-sm">
+            No hay inspecciones programadas próximamente.
+          </div>
+        ) : inspeccionesFiltradas.length === 0 && selectedDate ? (
           <div className="card text-center py-8 text-gray-400 text-sm">
             No hay inspecciones para esta fecha.
           </div>
@@ -310,7 +365,7 @@ export default function CalendarioInspecciones({
                     {insp.negocioDomicilio}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    {new Date(insp.fechaProgramada).toLocaleDateString('es-PE', {
+                    {new Date(insp.fechaProgramada!).toLocaleDateString('es-PE', {
                       weekday: 'long',
                       day: '2-digit',
                       month: 'long',

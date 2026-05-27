@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
           ...asignacion.datos,
         },
         mensaje: asignacion.exito
-          ? 'Pago confirmado. Inspección agendada.'
+          ? 'Pago confirmado. Inspector asignado, pendiente de programar fecha.'
           : 'Pago confirmado. Comprobante generado.',
       });
     }

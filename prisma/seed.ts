@@ -321,8 +321,7 @@ async function main() {
     const result = await asignarInspector(tid);
     if (result.exito) {
       const inspNombre = result.datos?.inspectorNombre as string;
-      const fechaProg = result.datos?.fechaProgramada as string;
-      console.log(`   ✓ ${tid} → Inspector: ${inspNombre}, Fecha: ${fechaProg?.slice(0, 10)}`);
+      console.log(`   ✓ ${tid} → Inspector: ${inspNombre} (pendiente de programar fecha)`);
     } else {
       console.log(`   ✗ ${tid} → Error: ${result.error}`);
     }

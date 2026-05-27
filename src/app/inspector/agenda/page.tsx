@@ -51,7 +51,7 @@ export default async function AgendaInspectorPage() {
   // Serialize for the client calendar component
   const inspeccionesCalendario: InspeccionCalendario[] = inspecciones.map((i) => ({
     id: i.id,
-    fechaProgramada: i.fechaProgramada.toISOString(),
+    fechaProgramada: i.fechaProgramada?.toISOString() ?? null,
     completada: i.completada,
     resultado: i.resultado,
     numeroVisita: i.numeroVisita,
